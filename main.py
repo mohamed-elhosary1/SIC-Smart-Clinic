@@ -12,49 +12,53 @@ from datetime import datetime
 
 class ClinicError(Exception):
     """
-    Base exception for the whole clinic system.
-    All custom exceptions below should inherit from this one.
+      inherit دا الاكسبشنز الاساسي اي حاجة تحته لازم يكزن في
+      #TODO
     """
     pass
 
 
 class InvalidAppointmentTimeError(ClinicError):
-    """Raised when an appointment time is invalid (past date, wrong format, etc.)."""
+    # اخطاء الوقت هسيب تفاصيل  واكتب الرسالة دي وانت بتعمل رايز
+    """ time is invalid (past date, wrong format, etc.)."""
     # TODO
     pass
 
 
 class DuplicateBookingError(ClinicError):
-    """Raised when a patient tries to book a slot that is already taken."""
+    """ patient tries to book a slot that is already taken"""
     # TODO
     pass
 
 
 class PatientNotFoundError(ClinicError):
-    """Raised when a given patient ID does not exist in the system."""
+    """Raised when a given patient ID does not exist in the system"""
     # TODO
     pass
 
 
 class DoctorNotFoundError(ClinicError):
-    """Raised when a given doctor ID does not exist in the system."""
+    """Raised when a given doctor ID does not exist in the system"""
     # TODO
     pass
 
 
 class InvalidFormatError(ClinicError):
-    """Raised when a field (ID/phone) fails regex validation."""
+    """Raised when a field fails regex validation."""
+    # التلفون وال ID بس
     # TODO
     pass
 
-
-# Compatibility aliases for omar_part naming
+# توافق فكك منه
 Clinic_Error = ClinicError
 Invalidappointment_time_Error = InvalidAppointmentTimeError
 DuplicatingBoking_Error = DuplicateBookingError
 PateintNotFound_Error = PatientNotFoundError
 DocumentNotFound_Error = DoctorNotFoundError
 
+r"""
+ونبي ظبط الجزء دا سايب كومنت ملون عشان تشوفه 
+"""
 
 # Regex patterns (required: at least 2 validated fields)
 PATIENT_ID_PATTERN = re.compile(r"patient-[0-9]+")   # TODO: define patient ID pattern
@@ -64,6 +68,7 @@ PHONE_PATTERN = re.compile(r"01[0-9]{9}")        # TODO: define phone number pat
 
 def validate_patient_id(patient_id: str) -> bool:
     """Check whether patient_id matches PATIENT_ID_PATTERN."""
+    # عندي فكرة ID GENERATING حلوة قدام
     # TODO
     if PATIENT_ID_PATTERN.fullmatch(patient_id):
         return True
@@ -83,7 +88,6 @@ def validate_phone(phone: str) -> bool:
     return bool(PHONE_PATTERN.fullmatch(phone))
 
 
-# Compatibility alias for omar_part
 validate_phone_ = validate_phone
 
 
@@ -93,10 +97,7 @@ validate_phone_ = validate_phone
 # =========================================================
 
 class Person:
-    """
-    Base class for anyone in the clinic system (patients and doctors).
-    Holds the shared identity fields (id, name, phone).
-    """
+
 
     def __init__(self, person_id: str, name: str, phone: str):
         # TODO: store fields + call phone/id validation
@@ -106,10 +107,7 @@ class Person:
         self.phone_ = phone
 
     def display_profile(self):
-        """
-        Must be overridden by subclasses with REAL different behavior
-        (not just the same output with a different label).
-        """
+
         # TODO
         return f"{self.person_id} {self.name} {self.phone}"
 
@@ -120,8 +118,7 @@ class Person:
 
 class Patient(Person):
     """
-    Represents a clinic patient. Holds medical/queue-related info
-    on top of the base Person fields.
+    Represents a clinic patient
     """
 
     def __init__(self, person_id: str, name: str, phone: str, age: int, case_type: str):
@@ -135,15 +132,11 @@ class Patient(Person):
         self.history = self.visit_history
 
     def display_profile(self):
-        """Override: show patient-specific info (case_type, history...)."""
-        # TODO
+#المريض مش الدكتور         # TODO
         return f"{self.person_id} {self.name} {self.phone} {self.age} {self.case_type}"
 
     def priority_level(self):
-        """
-        Must be overridden in EmergencyPatient / RegularPatient.
-        This is the core polymorphism used to sort the waiting queue.
-        """
+        # ياريت تتقسم درجات مش ترو وفولس
         # TODO
         return 2
 
@@ -152,21 +145,23 @@ class Patient(Person):
 
 
 class EmergencyPatient(Patient):
-    """A patient with an urgent/emergency case type — highest queue priority."""
+    """A patient with an urgent/emergency case type ."""
+    # راجل بيموت مننا
 
     def priority_level(self):
         # TODO: must return a genuinely different value/behavior than RegularPatient
         return 1
 
     def display_profile(self):
-        """Override: adds emergency-specific details to the profile."""
+        """ adds emergency-specific details to the profile."""
         # TODO
         base_profile = super().display_profile()
         return f"{base_profile} high priority"
 
 
 class RegularPatient(Patient):
-    """A patient with a normal (non-emergency) case type."""
+    """A patient with a normal case type."""
+    # مش طوارئ لو مش فاهم
 
     def priority_level(self):
         # TODO: normal priority logic, different from EmergencyPatient
@@ -178,8 +173,7 @@ class RegularPatient(Patient):
 
 
 class Doctor(Person):
-    """Represents a doctor with a specialty and availability status."""
-
+# ونبي اقري اسم الكلاس قبل ما تعدلي :)
     def __init__(self, person_id: str, name: str, phone: str, specialty: str, availability: bool = True):
         super().__init__(person_id, name, phone)
         # TODO
@@ -189,7 +183,7 @@ class Doctor(Person):
         self.availability = availability
 
     def display_profile(self):
-        """Override: show doctor-specific info (specialty, availability)."""
+        # بتاعتتتت الدكتور اوعي تتلغيطي وتحطي المريض
         # TODO
         return f"{self.doctor_id} {self.name} {self.phone} {self.specialty}"
 
@@ -200,7 +194,7 @@ class Doctor(Person):
 class Appointment:
     """
     Links a patient with a doctor at a given time, and tracks
-    the visit status (pending/completed/cancelled, etc.).
+    the visit status (pending/completed/cancelled.).
     """
 
     booked_date = {}
@@ -221,15 +215,14 @@ class Appointment:
         self.fee = fee  # TODO: set via the closure fee calculator
 
     def update_status(self, new_status: str):
-        """Update the appointment's status (e.g. pending -> completed)."""
+        """Update the appointment's status (pending -> completed)"""
         # TODO
         self.status = new_status
 
     def __str__(self):
         return f"{self.patient.person_id} {self.doctor.person_id} {self.time} {self.status}"
 
-
-# Compatibility aliases for omar_part naming
+# توافق الاسماء متلعبوش فيها
 person = Person
 patient = Patient
 emergency_patient = EmergencyPatient
@@ -244,11 +237,7 @@ appointment = Appointment
 # =========================================================
 
 class WaitingQueueIterator:
-    """
-    Custom iterator that walks through the waiting queue one
-    appointment at a time. Must implement __iter__/__next__
-    properly (not just wrap a list).
-    """
+    # مش عارف اعبر بس هتفهميها يعني
 
     def __init__(self, appointments: list):
         self._appointments = appointments
@@ -270,17 +259,14 @@ class WaitingQueueIterator:
 # =========================================================
 
 def make_triage_calculator(base_fee: float):
-    """
-    Returns a closure function that calculates a visit fee/priority
-    based on a patient's priority_level(). Must use `nonlocal` to
-    track state that changes across calls (e.g. emergency count).
-    """
+
     emergency_count = 0  # state that changes inside the closure
 
     def calculate(patient: Patient) -> float:
         nonlocal emergency_count
         # TODO: compute the fee based on patient.priority_level()
         # if emergency: emergency_count += 1
+        # بتشتغل عادي ( مش لاقي ايموجي سهم لفوق )
         pass
 
     return calculate
@@ -346,6 +332,7 @@ class ClinicManager:
 
     def get_waiting_queue_iterator(self):
         """Return a ready-to-use WaitingQueueIterator over current appointments."""
+        # ملاحظة انا قرفت وانا بكتب الكلام دا كلو فانجزو
         # TODO
         pass
 
@@ -355,10 +342,6 @@ class ClinicManager:
         pass
 
     def daily_report(self):
-        """
-        Generate a real report from actual data: number of cases,
-        emergencies, and revenue. Must not be decorative/fake output.
-        """
         # TODO
         pass
 

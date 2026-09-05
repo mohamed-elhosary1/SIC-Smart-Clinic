@@ -58,6 +58,6 @@ python clinic_system.py
 | **Inheritance / Polymorphism** | `Person → Patient/Doctor`, `Patient → EmergencyPatient/RegularPatient` | سلوك مختلف فعليًا في `display_profile()` و `priority_level()` |
 
 ## Known Limitations
-- المشروع حاليًا في مرحلة السكيلتون — الميثودز الأساسية (`#TODO`) لسه ملهاش تنفيذ فعلي
+ق- المشروع حاليًا في مرحلة السكيلتون — الميثودز الأساسية (`#TODO`) لسه ملهاش تنفيذ فعلي
 - مفيش تخزين دائم (JSON save/load) — البيانات بتتفقد بعد إغلاق البرنامج
 - الـ `main()` لسه فاضية ومحتاجة تتوصل بالـ `ClinicManager`
