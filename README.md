@@ -1,15 +1,10 @@
-# Smart Clinic Queue System
+# Smart Clinic  System
 
-مشروع Chapter 3 Capstone — Samsung Innovation Campus (Effective Python Programming)
+مشروع Chapter 3  — Samsung Innovation Campus
 
-## Selected Option
-**Option 5 — Smart Clinic Queue System**
-إدارة المرضى، الدكاترة، الحجوزات، التريـاچ (الأولوية)، وطابور الانتظار.
+** 5 — Smart Clinic Queue System**
+إدارة التعبيانين الدكاترة، الحجوزات، لأولوية وطابور الانتظار.
 
-## How to Run
-```bash
-python clinic_system.py
-```
 هيظهر منيو تفاعلي في الـ terminal فيه الاختيارات دي:
 1. Register patient
 2. Add doctor
@@ -19,7 +14,6 @@ python clinic_system.py
 6. Daily report
 7. Quit
 
-> **ملاحظة:** الكود الحالي سكيلتون (هيكل) — الميثودز فيها `#TODO` لسه محتاجة تتنفذ من الفريق قبل التشغيل الفعلي.
 
 ## Main Features
 - تسجيل مرضى (عاديين وطوارئ) ودكاترة مع التحقق من صحة الـ ID ورقم التليفون
@@ -56,8 +50,3 @@ python clinic_system.py
 | **Exceptions** | `InvalidAppointmentTimeError`, `DuplicateBookingError`, `PatientNotFoundError`, `DoctorNotFoundError`, `InvalidFormatError` | معالجة كل حالات الخطأ المحتملة أثناء الحجز والتسجيل |
 | **Iterator** | `WaitingQueueIterator` (`__iter__` / `__next__`) | معالجة طابور الانتظار عنصر عنصر بدل استخدام list عادي |
 | **Inheritance / Polymorphism** | `Person → Patient/Doctor`, `Patient → EmergencyPatient/RegularPatient` | سلوك مختلف فعليًا في `display_profile()` و `priority_level()` |
-
-## Known Limitations
-ق- المشروع حاليًا في مرحلة السكيلتون — الميثودز الأساسية (`#TODO`) لسه ملهاش تنفيذ فعلي
-- مفيش تخزين دائم (JSON save/load) — البيانات بتتفقد بعد إغلاق البرنامج
-- الـ `main()` لسه فاضية ومحتاجة تتوصل بالـ `ClinicManager`
