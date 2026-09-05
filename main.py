@@ -421,19 +421,36 @@ class ClinicManager:
             "total_revenue": revenue
         }
 
-        print("\n" + "=" * 45)
-        print("          CLINIC DAILY REPORT          ")
-        print("=" * 45)
-        print(f" Registered Patients: {report['total_patients']}")
-        print(f" Registered Doctors : {report['total_doctors']}")
-        print(f" Total Appointments : {len(self.appointments)}")
-        print(f"   - Pending        : {report['pending_visits']}")
-        print(f"   - Completed      : {report['completed_visits']}")
-        print(f"   - Cancelled      : {report['cancelled_visits']}")
-        print(f"   - In Progress    : {report['in_progress_visits']}")
-        print(f" Emergency Cases    : {report['emergency_patients']}")
-        print(f" Total Revenue      : ${report['total_revenue']:.2f}")
-        print("=" * 45 + "\n")
+        # عرض التقرير في frame منظم بعرض موحد 56 حرف ومحاذاة الأرقام يمين والتسميات شمال
+        border = "+" + "=" * 54 + "+"
+        mid_sep = "+" + "-" * 39 + "+" + "-" * 14 + "+"
+
+        print("\n" + border)
+        print("|" + "CLINIC DAILY REPORT".center(54) + "|")
+        print(border)
+        lbl_h, val_h = "Metric Description", "Count / Sum"
+        print(f"| {lbl_h:<37} | {val_h:>12} |")
+        print(mid_sep)
+
+        metrics = [
+            ("Registered Patients", str(report["total_patients"])),
+            ("Registered Doctors", str(report["total_doctors"])),
+            ("Total Appointments", str(len(self.appointments))),
+            ("  - Pending Visits", str(report["pending_visits"])),
+            ("  - Completed Visits", str(report["completed_visits"])),
+            ("  - Cancelled Visits", str(report["cancelled_visits"])),
+            ("  - In Progress Visits", str(report["in_progress_visits"])),
+            ("Emergency Cases Treated", str(report["emergency_patients"])),
+        ]
+
+        for m_label, m_val in metrics:
+            print(f"| {m_label:<37} | {m_val:>12} |")
+
+        print(mid_sep)
+        rev_str = f"${report['total_revenue']:.2f}"
+        rev_label = "Total Revenue Collected"
+        print(f"| {rev_label:<37} | {rev_str:>12} |")
+        print(border + "\n")
 
         return report
 
@@ -477,10 +494,10 @@ class ClinicManager:
             }
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
-            print(f" Success: Clinic data saved to '{path}'.")
+            print(f"\n[SUCCESS] Clinic data saved successfully to '{path}'.\n")
             return True
         except Exception as e:
-            print(f" Error saving data to '{path}': {e}")
+            print(f"\n[ERROR] Failed saving data to '{path}': {e}\n")
             return False
 
     def load_from_file(self, path: str = "clinic_data.json") -> bool:
@@ -492,7 +509,7 @@ class ClinicManager:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as e:
-            print(f" Error reading '{path}': {e}")
+            print(f"\n[ERROR] Failed reading '{path}': {e}\n")
             return False
 
         self.patients.clear()
@@ -522,7 +539,7 @@ class ClinicManager:
                     )
                 self.patients[patient.person_id] = patient
             except Exception as e:
-                print(f" Warning: Could not reconstruct patient {p_data}: {e}")
+                print(f"[ERROR] Could not reconstruct patient {p_data}: {e}")
 
         # 2. Reconstruct Doctors
         for d_data in data.get("doctors", []):
@@ -537,7 +554,7 @@ class ClinicManager:
                 self.doctors[doctor.person_id] = doctor
                 self.booked_date[doctor.person_id] = []
             except Exception as e:
-                print(f" Warning: Could not reconstruct doctor {d_data}: {e}")
+                print(f"[ERROR] Could not reconstruct doctor {d_data}: {e}")
 
         # 3. Reconstruct Appointments & Rebuild booked_date
         for a_data in data.get("appointments", []):
@@ -573,9 +590,9 @@ class ClinicManager:
                         if time_obj not in self.booked_date[d_id]:
                             self.booked_date[d_id].append(time_obj)
                 except Exception as e:
-                    print(f" Warning: Could not reconstruct appointment {a_data}: {e}")
+                    print(f"[ERROR] Could not reconstruct appointment {a_data}: {e}")
 
-        print(f" Loaded data successfully from '{path}': {len(self.patients)} Patients, {len(self.doctors)} Doctors, {len(self.appointments)} Appointments.")
+        print(f"\n[SUCCESS] Loaded data successfully from '{path}': {len(self.patients)} Patients, {len(self.doctors)} Doctors, {len(self.appointments)} Appointments.\n")
         return True
 
 
@@ -583,63 +600,77 @@ class ClinicManager:
 # INTERACTIVE CLI
 # =========================================================
 
+def print_section_header(title: str, width: int = 54):
+    """طباعة عنوان القسم داخل فريم موحد ونظيف بعرض ثابت"""
+    print("\n+" + "-" * width + "+")
+    print("|" + title.center(width) + "|")
+    print("+" + "-" * width + "+")
+
+
 def main():
     manager = ClinicManager(base_fee=100.0)
 
-    print("\n" + "=" * 50)
-    print("  WELCOME TO SMART CLINIC QUEUE SYSTEM  ")
-    print("=" * 50)
+    # رسالة الترحيب في بداية البرنامج
+    print("\n+" + "=" * 54 + "+")
+    print("|" + "WELCOME TO SMART CLINIC QUEUE SYSTEM".center(54) + "|")
+    print("|" + "Samsung Innovation Campus - Capstone".center(54) + "|")
+    print("+" + "=" * 54 + "+")
 
     # محاولة التحميل التلقائي لو الملف موجود
     if not manager.load_from_file("clinic_data.json"):
-        print("No existing data file found. Starting with a fresh database.")
+        print("\n[INFO] No existing database file found. Starting with fresh data.\n")
 
     while True:
-        print("\n----- MAIN MENU -----")
-        print("1. Register patient")
-        print("2. Add doctor")
-        print("3. Book appointment")
-        print("4. Update visit status")
-        print("5. Show waiting queue")
-        print("6. Daily report")
-        print("7. Save data now")
-        print("8. Quit (Auto-save)")
+        # المنيو الرئيسية في فريم منظم وأيقونات نصية آمنة (بدون مشاكل ترميز)
+        # ملاحظة: تم استخدام علامات نصية آمنة [1]..[8] متوافقة 100% مع أنظمة Windows Console
+        print("\n+" + "=" * 54 + "+")
+        print("|" + "CLINIC MAIN MENU".center(54) + "|")
+        print("+" + "=" * 54 + "+")
+        print("|  [1] Register Patient     : Add new patient record   |")
+        print("|  [2] Add Doctor           : Register medical doctor  |")
+        print("|  [3] Book Appointment     : Schedule a clinic visit  |")
+        print("|  [4] Update Visit Status  : Manage appointment state |")
+        print("|  [5] Show Waiting Queue   : View prioritized queue   |")
+        print("|  [6] Daily Report         : View clinic statistics   |")
+        print("|  [7] Save Data Now        : Save database to JSON    |")
+        print("|  [8] Quit (Auto-Save)     : Save data and exit       |")
+        print("+" + "-" * 54 + "+")
 
-        raw_choice = input("\nEnter your choice (1-8): ").strip()
+        raw_choice = input("\nEnter choice (1-8): ").strip()
         choice = parse_menu_choice(raw_choice)
 
         if choice == "1":
-            print("\n--- Register Patient ---")
+            print_section_header("REGISTER PATIENT")
             
             # نوع المريض (يقبل 1، 2، Regular، Emergency، عادي، طوارئ)
             while True:
-                raw_type = input("Patient Type (1: Regular, 2: Emergency) [Default: Regular]: ").strip()
+                raw_type = input("  Patient Type   (1: Regular, 2: Emergency) [Default: 1]: ").strip()
                 p_type = parse_patient_type(raw_type)
                 if p_type:
                     break
-                print(" Error: Please enter '1' / 'Regular' or '2' / 'Emergency'. Try again.")
+                print("\n[ERROR] Please enter '1' / 'Regular' or '2' / 'Emergency'. Try again.\n")
 
             # توليد ID تلقائي من 1 لـ 1000 باستخدام randint مع التأكد من عدم التكرار
             p_id = manager.generate_unique_patient_id()
 
             # الاسم
             while True:
-                name = input("Full Name [or 'cancel' to exit]: ").strip()
+                name = input("  Full Name      [or 'cancel' to exit]: ").strip()
                 if name.lower() == "cancel":
                     break
                 if name:
                     break
-                print(" Error: Name cannot be empty. Please try again.")
+                print("\n[ERROR] Patient name cannot be empty. Please try again.\n")
             if name.lower() == "cancel":
                 continue
 
             # رقم التليفون
             while True:
-                phone = input("Phone (11 digits, e.g. 01012345678) [or 'cancel']: ").strip()
+                phone = input("  Phone Number   (11 digits, e.g. 01012345678) [or 'cancel']: ").strip()
                 if phone.lower() == "cancel":
                     break
                 if not validate_phone(phone):
-                    print(f" Error: Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.")
+                    print(f"\n[ERROR] Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.\n")
                     continue
                 break
             if phone.lower() == "cancel":
@@ -647,7 +678,7 @@ def main():
 
             # العمر
             while True:
-                age_input = input("Age [or 'cancel']: ").strip()
+                age_input = input("  Patient Age    [or 'cancel']: ").strip()
                 if age_input.lower() == "cancel":
                     break
                 try:
@@ -656,11 +687,13 @@ def main():
                         raise ValueError
                     break
                 except ValueError:
-                    print(f" Error: Age must be a valid positive integer (e.g. 25). Got '{age_input}'. Please try again.")
+                    print(f"\n[ERROR] Age must be a valid positive integer between 1 and 130. Got '{age_input}'. Please try again.\n")
             if age_input.lower() == "cancel":
                 continue
 
-            case_type = input("Case description: ").strip()
+            case_type = input("  Diagnosis/Case [or 'cancel']: ").strip()
+            if case_type.lower() == "cancel":
+                continue
 
             try:
                 if p_type == "2":
@@ -668,31 +701,42 @@ def main():
                 else:
                     new_p = RegularPatient(p_id, name, phone, age, case_type)
                 manager.register_patient(new_p)
-                print("\n" + "-" * 40)
-                print(f" Registration Successful!")
-                print(f" >>> YOUR ASSIGNED PATIENT ID: {p_id} <<<")
-                print(f" Details: {new_p.display_profile()}")
-                print("-" * 40)
+                
+                # كارت بيانات التسجيل بنجاح مع إبراز الـ ID التلقائي
+                p_type_label = "Emergency (High Priority)" if p_type == "2" else "Regular"
+                print(f"\n[SUCCESS] Patient registered successfully!")
+                print("+" + "-" * 54 + "+")
+                print("|" + "REGISTRATION DETAILS".center(54) + "|")
+                print("+" + "-" * 54 + "+")
+                id_badge = f">>> YOUR ASSIGNED PATIENT ID: {p_id} <<<"
+                print("|" + id_badge.center(54) + "|")
+                print("+" + "-" * 54 + "+")
+                print(f"|  Patient Name  : {new_p.name:<35} |")
+                print(f"|  Patient Type  : {p_type_label:<35} |")
+                print(f"|  Phone Number  : {new_p.phone:<35} |")
+                print(f"|  Age           : {str(new_p.age):<35} |")
+                print(f"|  Diagnosis     : {(new_p.case_type or 'General Checkup'):<35} |")
+                print("+" + "-" * 54 + "+\n")
             except ClinicError as err:
-                print(f" Error: {err}")
+                print(f"\n[ERROR] Registration failed: {err}\n")
 
         elif choice == "2":
-            print("\n--- Add Doctor ---")
+            print_section_header("ADD DOCTOR")
             
             # كود الدكتور (يقبل إدخال يدوي أو توليد تلقائي بـ randint لو داس Enter)
             while True:
-                d_id = input("Doctor ID (Press Enter for auto-generated ID, or type doctor-<num>) [or 'cancel']: ").strip()
+                d_id = input("  Doctor ID      (Press Enter for auto-id, or doctor-<num>) [or 'cancel']: ").strip()
                 if d_id.lower() == "cancel":
                     break
                 if not d_id:
                     d_id = manager.generate_unique_doctor_id()
-                    print(f" Generated Doctor ID: {d_id}")
+                    print(f"\n[INFO] Generated Doctor ID: {d_id}\n")
                     break
                 if not validate_doctor_id(d_id):
-                    print(f" Error: Invalid doctor ID format: '{d_id}'. Expected 'doctor-<number>'. Please try again.")
+                    print(f"\n[ERROR] Invalid doctor ID format: '{d_id}'. Expected 'doctor-<number>'. Please try again.\n")
                     continue
                 if d_id in manager.doctors:
-                    print(f" Error: Doctor with ID '{d_id}' already exists. Please enter a different ID.")
+                    print(f"\n[ERROR] Doctor with ID '{d_id}' already exists. Please enter a different ID.\n")
                     continue
                 break
             if d_id.lower() == "cancel":
@@ -700,132 +744,193 @@ def main():
 
             # الاسم
             while True:
-                name = input("Doctor Name: ").strip()
+                name = input("  Doctor Name    [or 'cancel']: ").strip()
+                if name.lower() == "cancel":
+                    break
                 if name:
                     break
-                print(" Error: Doctor name cannot be empty. Please try again.")
+                print("\n[ERROR] Doctor name cannot be empty. Please try again.\n")
+            if name.lower() == "cancel":
+                continue
 
             # رقم التليفون
             while True:
-                phone = input("Phone (11 digits, e.g. 01112345678): ").strip()
+                phone = input("  Phone Number   (11 digits, e.g. 01112345678) [or 'cancel']: ").strip()
+                if phone.lower() == "cancel":
+                    break
                 if not validate_phone(phone):
-                    print(f" Error: Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.")
+                    print(f"\n[ERROR] Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.\n")
                     continue
                 break
+            if phone.lower() == "cancel":
+                continue
 
-            specialty = input("Specialty: ").strip()
+            specialty = input("  Specialty      [or 'cancel']: ").strip()
+            if specialty.lower() == "cancel":
+                continue
 
             try:
                 new_doc = Doctor(d_id, name, phone, specialty)
                 manager.add_doctor(new_doc)
-                print(f" Success: Added Doctor [{d_id}] - {new_doc.display_profile()}")
+                doc_title = new_doc.name if new_doc.name.lower().startswith("dr.") else f"Dr. {new_doc.name}"
+                print(f"\n[SUCCESS] Added Doctor [{d_id}] - {doc_title} ({new_doc.specialty})\n")
             except ClinicError as err:
-                print(f" Error: {err}")
+                print(f"\n[ERROR] Failed to add doctor: {err}\n")
 
         elif choice == "3":
-            print("\n--- Book Appointment ---")
+            print_section_header("BOOK APPOINTMENT")
             if not manager.doctors:
-                print("No doctors available. Please add a doctor first.")
+                print("\n[ERROR] No doctors available in the clinic. Please add a doctor first.\n")
                 continue
             if not manager.patients:
-                print("No patients registered. Please register a patient first.")
+                print("\n[ERROR] No patients registered yet. Please register a patient first.\n")
                 continue
 
-            print("Available Doctors:")
+            # عرض قائمة الدكاترة المتاحين بشكل مرتب ومحاذي
+            print("\nAvailable Doctors in Clinic:")
+            print("  " + "-" * 60)
             for d in manager.doctors.values():
-                print(f"  {d.display_profile()}")
+                avail = "Available" if d.availability else "Unavailable"
+                print(f"  * [{d.person_id}] Dr. {d.name:<18} | Specialty: {d.specialty:<15} [{avail}]")
+            print("  " + "-" * 60 + "\n")
 
-            # مريض
+            # اختيار المريض
             while True:
-                p_id = input("Enter Patient ID (e.g. patient-123) [or 'cancel' to exit]: ").strip()
+                p_id = input("  Patient ID     (e.g. patient-123) [or 'cancel' to exit]: ").strip()
                 if p_id.lower() == "cancel":
                     break
                 if p_id not in manager.patients:
-                    print(f" Error: Patient ID '{p_id}' not found in system. Please try again.")
+                    print(f"\n[ERROR] Patient ID '{p_id}' not found in system. Please try again.\n")
                     continue
                 break
             if p_id.lower() == "cancel":
                 continue
 
-            # دكتور
+            # اختيار الدكتور
             while True:
-                d_id = input("Enter Doctor ID (e.g. doctor-101) [or 'cancel' to exit]: ").strip()
+                d_id = input("  Doctor ID      (e.g. doctor-101)  [or 'cancel' to exit]: ").strip()
                 if d_id.lower() == "cancel":
                     break
                 if d_id not in manager.doctors:
-                    print(f" Error: Doctor ID '{d_id}' not found in system. Please try again.")
+                    print(f"\n[ERROR] Doctor ID '{d_id}' not found in system. Please try again.\n")
                     continue
                 if not manager.doctors[d_id].availability:
-                    print(f" Error: Dr. {manager.doctors[d_id].name} is marked as unavailable. Please choose another doctor.")
+                    print(f"\n[ERROR] Dr. {manager.doctors[d_id].name} is marked as unavailable. Please choose another doctor.\n")
                     continue
                 break
             if d_id.lower() == "cancel":
                 continue
 
-            # موعد
+            # تحديد الموعد
             while True:
-                time_input = input("Appointment Time (YYYY-MM-DD HH:MM) [or 'cancel' to exit]: ").strip()
+                time_input = input("  Date & Time    (YYYY-MM-DD HH:MM) [or 'cancel' to exit]: ").strip()
                 if time_input.lower() == "cancel":
                     break
                 try:
                     appt = manager.book_appointment(p_id, d_id, time_input)
-                    print(f" Success: Booked appointment!\n   {appt}")
+                    print(f"\n[SUCCESS] Booked appointment successfully!")
+                    print(f"   Patient : {appt.patient.name} ({appt.patient.person_id})")
+                    print(f"   Doctor  : Dr. {appt.doctor.name} ({appt.doctor.person_id})")
+                    time_disp = appt.time.strftime('%Y-%m-%d %H:%M') if isinstance(appt.time, datetime) else str(appt.time)
+                    print(f"   Time    : {time_disp}")
+                    print(f"   Fee     : ${appt.fee:.2f}\n")
                     break
                 except (InvalidAppointmentTimeError, DuplicateBookingError, ClinicError) as err:
-                    print(f" Error: {err}. Please try again.")
+                    print(f"\n[ERROR] {err}. Please try again.\n")
 
         elif choice == "4":
-            print("\n--- Update Visit Status ---")
+            print_section_header("UPDATE VISIT STATUS")
             if not manager.appointments:
-                print("No appointments found.")
+                print("\n[INFO] No appointments found in the system.\n")
                 continue
 
+            print("\nCurrent Appointments:")
+            print("  " + "-" * 75)
             for idx, a in enumerate(manager.appointments):
-                print(f"[{idx}] {a}")
+                time_s = a.time.strftime("%Y-%m-%d %H:%M") if isinstance(a.time, datetime) else str(a.time)
+                print(f"  [{idx}] Patient: {a.patient.person_id:<12} | Dr. {a.doctor.name:<15} | Time: {time_s} | Status: {a.status.upper()}")
+            print("  " + "-" * 75 + "\n")
 
             # اختيار رقم الموعد
             while True:
-                idx_input = input("Enter appointment index to update [or 'cancel' to exit]: ").strip()
+                idx_input = input("  Appointment Index [or 'cancel' to exit]: ").strip()
                 if idx_input.lower() == "cancel":
                     break
                 try:
                     idx = int(idx_input)
                     if idx < 0 or idx >= len(manager.appointments):
-                        print(f" Error: Index must be between 0 and {len(manager.appointments) - 1}. Please try again.")
+                        print(f"\n[ERROR] Index must be between 0 and {len(manager.appointments) - 1}. Please try again.\n")
                         continue
                     break
                 except ValueError:
-                    print(f" Error: '{idx_input}' is not a valid number. Please try again.")
+                    print(f"\n[ERROR] '{idx_input}' is not a valid integer. Please try again.\n")
             if idx_input.lower() == "cancel":
                 continue
 
             # اختيار الحالة الجديدة (يقبل نصوص مرنة)
             while True:
-                raw_status = input("Enter new status (pending / completed / cancelled / in_progress) [or 'cancel']: ").strip()
+                raw_status = input("  New Status (pending / completed / cancelled / in_progress) [or 'cancel']: ").strip()
                 if raw_status.lower() == "cancel":
                     break
                 norm_status = parse_status(raw_status)
                 if not norm_status:
-                    print(f" Error: Invalid status '{raw_status}'. Allowed: pending, completed, cancelled, in_progress. Please try again.")
+                    print(f"\n[ERROR] Invalid status '{raw_status}'. Allowed: pending, completed, cancelled, in_progress.\n")
                     continue
                 try:
                     updated = manager.update_visit_status(idx, norm_status)
-                    print(f" Success: Updated appointment [{idx}] to '{updated.status.upper()}'")
+                    print(f"\n[SUCCESS] Updated appointment [{idx}] status to '{updated.status.upper()}'.\n")
                     break
                 except ValueError as err:
-                    print(f" Error: {err}. Please try again.")
+                    print(f"\n[ERROR] Update failed: {err}. Please try again.\n")
 
         elif choice == "5":
-            print("\n--- Waiting Queue (Priority Sorted: Emergency First) ---")
+            # قائمة انتظار المرضى في جدول منظم بمحاذاة ثابتة وتمييز حالات الطوارئ
+            cols = [
+                ('#', 4, '<'),
+                ('Priority', 15, '<'),
+                ('Patient', 22, '<'),
+                ('Doctor', 20, '<'),
+                ('Appointment Time', 18, '<'),
+                ('Fee', 10, '<'),
+            ]
+            header_cells = [f"{title:{align}{w}}" for title, w, align in cols]
+            header_row = "| " + " | ".join(header_cells) + " |"
+            sep_parts = ["-" * (w + 2) for _, w, _ in cols]
+            sep = "+" + "+".join(sep_parts) + "+"
+            full_w = len(sep) - 2
+
+            print_section_header("WAITING QUEUE (Emergency First, by Priority & Time)", width=full_w)
+            print(sep)
+            print(header_row)
+            print(sep)
+
             queue_iter = manager.get_waiting_queue_iterator()
             count = 0
             for appt in queue_iter:
                 count += 1
-                priority_label = "EMERGENCY" if appt.patient.priority_level() == 1 else "REGULAR"
-                print(f"{count}. [{priority_label}] Patient: {appt.patient.name} ({appt.patient.person_id}) | "
-                      f"Dr. {appt.doctor.name} | Time: {appt.time.strftime('%Y-%m-%d %H:%M')} | Fee: ${appt.fee:.2f}")
+                is_emergency = (appt.patient.priority_level() == 1)
+                # تمييز صفوف الطوارئ بـ [!] EMERGENCY عشان تبان واضحة ومميزة
+                priority_label = "[!] EMERGENCY" if is_emergency else "    REGULAR  "
+                p_display = f"{appt.patient.name} ({appt.patient.person_id})"
+                d_display = f"Dr. {appt.doctor.name}"
+                t_display = appt.time.strftime('%Y-%m-%d %H:%M') if isinstance(appt.time, datetime) else str(appt.time)
+                fee_display = f"${appt.fee:.2f}"
+
+                row_cells = [
+                    f"{str(count):<4}",
+                    f"{priority_label:<15}",
+                    f"{p_display:<22}",
+                    f"{d_display:<20}",
+                    f"{t_display:<18}",
+                    f"{fee_display:<10}"
+                ]
+                print("| " + " | ".join(row_cells) + " |")
+
             if count == 0:
-                print("Queue is currently empty (no pending appointments).")
+                empty_msg = "Queue is currently empty (no pending appointments in line)."
+                print("| " + empty_msg.ljust(full_w - 2) + " |")
+
+            print(sep + "\n")
 
         elif choice == "6":
             manager.daily_report()
@@ -834,13 +939,17 @@ def main():
             manager.save_to_file("clinic_data.json")
 
         elif choice == "8":
-            print("\nSaving data before exit...")
+            print("\n" + "-" * 54)
+            print(" Saving clinic database before exiting...")
             manager.save_to_file("clinic_data.json")
-            print("Thank you for using Smart Clinic Queue System. Goodbye!\n")
+            print("+" + "=" * 54 + "+")
+            print("|" + "Thank you for using Smart Clinic Queue System!".center(54) + "|")
+            print("|" + "Data saved successfully. Goodbye!".center(54) + "|")
+            print("+" + "=" * 54 + "+\n")
             break
 
         else:
-            print(f" Invalid choice '{raw_choice}'. Please choose from 1 to 8 (e.g. '1' or 'Register').")
+            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 8 (e.g. '1' or 'Register').\n")
 
 
 if __name__ == "__main__":
