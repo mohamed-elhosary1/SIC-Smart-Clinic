@@ -258,11 +258,18 @@ def make_triage_calculator(base_fee: float = 100.0, initial_emergency_count: int
     def get_emergency_count() -> int:
         return emergency_count
 
+    def decrement_emergency_count() -> int:
+        nonlocal emergency_count
+        if emergency_count > 0:
+            emergency_count -= 1
+        return emergency_count
+
     def reset_count():
         nonlocal emergency_count
         emergency_count = 0
 
     calculate.get_emergency_count = get_emergency_count
+    calculate.decrement_emergency_count = decrement_emergency_count
     calculate.reset_count = reset_count
     return calculate
 
@@ -419,6 +426,11 @@ class ClinicManager:
         # إزالة الموعد من سجل زيارات المريض
         if appt in appt.patient.visit_history:
             appt.patient.visit_history.remove(appt)
+
+        # تنقيص عداد حالات الطوارئ في الكلوزر عند حذف موعد طوارئ
+        if appt.patient.priority_level() == 1:
+            if hasattr(self.fee_calculator, "decrement_emergency_count"):
+                self.fee_calculator.decrement_emergency_count()
 
         return appt
 
@@ -1100,7 +1112,11 @@ def main():
                         print(f"\n[SUCCESS] Appointment [{idx}] deleted successfully!")
                         print(f"  Patient Record : {deleted.patient.display_profile()}")
                         print(f"  Doctor Record  : {deleted.doctor.display_profile()}")
-                        print(f"  Freed Slot     : {time_disp}\n")
+                        print(f"  Freed Slot     : {time_disp}")
+                        if deleted.patient.priority_level() == 1:
+                            rem_emg = manager.fee_calculator.get_emergency_count() if hasattr(manager.fee_calculator, "get_emergency_count") else 0
+                            print(f"  Emergency Count: Decremented in triage closure (Active: {rem_emg})")
+                        print()
                         break
                     except ValueError:
                         print(f"\n[ERROR] '{idx_input}' is not a valid integer. Please try again.\n")
