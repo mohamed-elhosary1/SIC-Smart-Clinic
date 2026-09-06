@@ -1,5 +1,22 @@
 {
-    "patients": [],
+    "patients": [
+        {
+            "type": "Regular",
+            "person_id": "patient-238",
+            "name": "Mohamed",
+            "phone": "01017513072",
+            "age": 19,
+            "case_type": "بموت"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-191",
+            "name": "Mohamed Elhosary",
+            "phone": "01017513072",
+            "age": 19,
+            "case_type": "Im dying"
+        }
+    ],
     "doctors": [],
     "appointments": []
 }

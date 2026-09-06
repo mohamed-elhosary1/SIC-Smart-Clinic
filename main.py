@@ -5,7 +5,7 @@ import random
 import re
 import shutil
 from functools import reduce
-from datetime import datetime, timedelta
+from datetime import datetime
 #----------------------------------------------
 
 # =========================================================
@@ -107,14 +107,18 @@ def parse_menu_choice(val: str) -> str:
         return "4"
     if v in ("5", "queue", "show queue", "show", "طابور"):
         return "5"
-    if v in ("6", "report", "daily report", "تقرير"):
+    if v in ("6", "toggle", "doctor status", "toggle doctor", "تبديل دكتور", "تبديل حالة الدكتور"):
         return "6"
-    if v in ("7", "save", "save data", "حفظ"):
+    if v in ("7", "delete", "del", "remove", "delete appointment", "حذف موعد", "مسح موعد"):
         return "7"
-    if v in ("8", "reset", "reset data", "clear", "مسح", "تصفير", "اعادة ضبط"):
+    if v in ("8", "report", "daily report", "تقرير"):
         return "8"
-    if v in ("9", "quit", "exit", "q", "خروج"):
+    if v in ("9", "save", "save data", "حفظ"):
         return "9"
+    if v in ("10", "reset", "reset data", "clear", "مسح", "تصفير", "اعادة ضبط"):
+        return "10"
+    if v in ("11", "quit", "exit", "q", "خروج"):
+        return "11"
     return v
 
 
@@ -133,7 +137,7 @@ class Person:
         self.phone = phone.strip()
 
     def display_profile(self) -> str:
-        return f"{self.person_id} {self.name} {self.phone}"
+        return f"[{self.person_id}] {self.name} | Phone: {self.phone}"
 
     def __str__(self) -> str:
         return self.display_profile()
@@ -149,8 +153,8 @@ class Patient(Person):
         self.visit_history: list = []
 
     def display_profile(self) -> str:
-        # بروفايل المريض
-        return f"{self.person_id} {self.name} {self.phone} {self.age} {self.case_type}"
+        # بروفايل المريض الأساسي
+        return f"[{self.person_id}] {self.name} | Phone: {self.phone} | Age: {self.age} | Case: {self.case_type or 'General Checkup'}"
 
     def priority_level(self) -> int:
         # درجة 2 للحالات العادية
@@ -166,9 +170,8 @@ class EmergencyPatient(Patient):
         return 1
 
     def display_profile(self) -> str:
-        # تمييز مريض الطوارئ
-        base_profile = super().display_profile()
-        return f"{base_profile} high priority"
+        # تمييز مريض الطوارئ بوضوح
+        return f"{super().display_profile()} | Priority: Emergency (High)"
 
 
 class RegularPatient(Patient):
@@ -177,8 +180,8 @@ class RegularPatient(Patient):
         return 2
 
     def display_profile(self) -> str:
-        base_profile = super().display_profile()
-        return f"{base_profile} regular priority"
+        # تمييز المريض العادي
+        return f"{super().display_profile()} | Priority: Regular (Normal)"
 
 
 class Doctor(Person):
@@ -192,7 +195,8 @@ class Doctor(Person):
     def display_profile(self) -> str:
         # بروفايل الدكتور وتخصصه وحالة توفره
         status_str = "Available" if self.availability else "Unavailable"
-        return f"{self.person_id} {self.name} {self.phone} {self.specialty} [{status_str}]"
+        doc_name = self.name if self.name.lower().startswith("dr.") else f"Dr. {self.name}"
+        return f"[{self.person_id}] {doc_name} | Phone: {self.phone} | Specialty: {self.specialty} | Status: [{status_str}]"
 
     def toggle_availability(self):
         self.availability = not self.availability
@@ -203,8 +207,7 @@ class Appointment:
         self.patient = patient
         self.doctor = doctor
         self.time = time
-        norm_status = parse_status(status) or status.strip().lower()
-        self.status = "pending" if norm_status == "scheduled" else norm_status
+        self.status = parse_status(status) or "pending"
         self.fee = float(fee)
 
     def update_status(self, new_status: str):
@@ -241,9 +244,9 @@ class WaitingQueueIterator:
         return current_appointment
 
 
-def make_triage_calculator(base_fee: float = 100.0):
+def make_triage_calculator(base_fee: float = 100.0, initial_emergency_count: int = 0):
     """كلوزر لحساب سعر الكشف مع عداد حالات الطوارئ بـ nonlocal"""
-    emergency_count = 0
+    emergency_count = initial_emergency_count
 
     def calculate(patient: Patient) -> float:
         nonlocal emergency_count
@@ -252,6 +255,15 @@ def make_triage_calculator(base_fee: float = 100.0):
             return float(base_fee * 1.5)  # زيادة 50% لحالات الطوارئ
         return float(base_fee)
 
+    def get_emergency_count() -> int:
+        return emergency_count
+
+    def reset_count():
+        nonlocal emergency_count
+        emergency_count = 0
+
+    calculate.get_emergency_count = get_emergency_count
+    calculate.reset_count = reset_count
     return calculate
 
 
@@ -306,6 +318,14 @@ class ClinicManager:
             self.booked_date[doctor.person_id] = []
         return doctor
 
+    def toggle_doctor_availability(self, doctor_id: str) -> bool:
+        """تبديل حالة توفر الطبيب (متاح / غير متاح)"""
+        if doctor_id not in self.doctors:
+            raise DoctorNotFoundError(f"Doctor ID '{doctor_id}' not found")
+        doc = self.doctors[doctor_id]
+        doc.toggle_availability()
+        return doc.availability
+
     # ---------- Appointments ----------
 
     def book_appointment(self, patient_id: str, doctor_id: str, time):
@@ -355,7 +375,7 @@ class ClinicManager:
         return new_appt
 
     def update_visit_status(self, appointment_index: int, new_status: str):
-        """تحديث حالة الكشف مع معالجة الإلغاء وتفريغ الوقت المحجوز"""
+        """تحديث حالة الكشف مع معالجة الإلغاء وتفريغ الوقت المحجوز والتحقق من التعارض عند إعادة التفعيل"""
         if appointment_index < 0 or appointment_index >= len(self.appointments):
             raise IndexError(f"Invalid appointment index {appointment_index}")
 
@@ -365,19 +385,40 @@ class ClinicManager:
 
         appt = self.appointments[appointment_index]
         old_status = appt.status
-        appt.update_status(norm_status)
-
-        # حل مشكلة الإلغاء: لما status يبقى cancelled نشيل الوقت من booked_date للدكتور
         doc_id = appt.doctor.person_id
-        if appt.status == "cancelled":
+
+        # التحقق عند إعادة تفعيل موعد كان ملغي لمنع التعارض إذا تم حجز الموعد لمريض آخر أثناء فترة الإلغاء
+        if old_status == "cancelled" and norm_status != "cancelled":
             if doc_id in self.booked_date and appt.time in self.booked_date[doc_id]:
-                self.booked_date[doc_id].remove(appt.time)
-        elif old_status == "cancelled" and appt.status != "cancelled":
-            # لو رجع من ملغي لحالة تانية نعيد حجز الوقت
+                raise DuplicateBookingError(
+                    f"Cannot reactivate appointment: Dr. {appt.doctor.name} already has another active appointment at this time"
+                )
             if doc_id not in self.booked_date:
                 self.booked_date[doc_id] = []
-            if appt.time not in self.booked_date[doc_id]:
-                self.booked_date[doc_id].append(appt.time)
+            self.booked_date[doc_id].append(appt.time)
+        elif norm_status == "cancelled" and old_status != "cancelled":
+            # تفريغ الوقت عند الإلغاء
+            if doc_id in self.booked_date and appt.time in self.booked_date[doc_id]:
+                self.booked_date[doc_id].remove(appt.time)
+
+        appt.update_status(norm_status)
+        return appt
+
+    def delete_appointment(self, appointment_index: int) -> Appointment:
+        """حذف موعد محدد من النظام وتحرير وقت الطبيب وتاريخ المريض (One Delete Action)"""
+        if appointment_index < 0 or appointment_index >= len(self.appointments):
+            raise IndexError(f"Invalid appointment index {appointment_index}")
+
+        appt = self.appointments.pop(appointment_index)
+
+        # تحرير الوقت من booked_date للدكتور لو الموعد مكنش ملغي
+        doc_id = appt.doctor.person_id
+        if doc_id in self.booked_date and appt.time in self.booked_date[doc_id]:
+            self.booked_date[doc_id].remove(appt.time)
+
+        # إزالة الموعد من سجل زيارات المريض
+        if appt in appt.patient.visit_history:
+            appt.patient.visit_history.remove(appt)
 
         return appt
 
@@ -407,6 +448,7 @@ class ClinicManager:
     def daily_report(self) -> dict:
         """تقرير يومي بإحصائيات العيادة"""
         emergency_count = len(self.get_emergency_patients())
+        closure_count = self.fee_calculator.get_emergency_count() if hasattr(self.fee_calculator, "get_emergency_count") else 0
         completed = len([a for a in self.appointments if a.status == "completed"])
         pending = len([a for a in self.appointments if a.status == "pending"])
         cancelled = len([a for a in self.appointments if a.status == "cancelled"])
@@ -417,6 +459,7 @@ class ClinicManager:
             "total_patients": len(self.patients),
             "total_doctors": len(self.doctors),
             "emergency_patients": emergency_count,
+            "emergency_fees_calculated": closure_count,
             "completed_visits": completed,
             "pending_visits": pending,
             "cancelled_visits": cancelled,
@@ -444,6 +487,7 @@ class ClinicManager:
             ("  - Cancelled Visits", str(report["cancelled_visits"])),
             ("  - In Progress Visits", str(report["in_progress_visits"])),
             ("Emergency Cases Treated", str(report["emergency_patients"])),
+            ("Emergency Fees (Closure)", str(report["emergency_fees_calculated"])),
         ]
 
         for m_label, m_val in metrics:
@@ -629,6 +673,10 @@ class ClinicManager:
         total_loaded = len(self.patients) + len(self.doctors) + len(self.appointments)
         if total_loaded > 0:
             print(f"\n[SUCCESS] Loaded data successfully from '{path}': {len(self.patients)} Patients, {len(self.doctors)} Doctors, {len(self.appointments)} Appointments.\n")
+
+        # مزامنة عداد الكلوزر مع عدد كشوفات الطوارئ المحفوظة
+        loaded_emergency_count = sum(1 for a in self.appointments if a.patient.priority_level() == 1)
+        self.fee_calculator = make_triage_calculator(base_fee=100.0, initial_emergency_count=loaded_emergency_count)
         return True
 
     def reset_database(self, path: str = "clinic_data.json") -> bool:
@@ -637,6 +685,8 @@ class ClinicManager:
         self.doctors.clear()
         self.appointments.clear()
         self.booked_date.clear()
+        if hasattr(self.fee_calculator, "reset_count"):
+            self.fee_calculator.reset_count()
         return self.save_to_file(path, silent=True)
 
 
@@ -657,7 +707,7 @@ def main():
     # رسالة الترحيب في بداية البرنامج
     print("\n+" + "=" * 54 + "+")
     print("|" + "WELCOME TO SMART CLINIC QUEUE SYSTEM".center(54) + "|")
-    print("|" + "Samsung Innovation Campus - Capstone".center(54) + "|")
+    print("|" + "Samsung Innovation Campus".center(54) + "|")
     print("+" + "=" * 54 + "+")
 
     # تحميل تلقائي موثوق عند بدء التشغيل (مع إنشاء الملف فوراً لو مش موجود ومعالجة أي تلف)
@@ -674,13 +724,15 @@ def main():
             print("|  [3] Book Appointment     : Schedule a clinic visit  |")
             print("|  [4] Update Visit Status  : Manage appointment state |")
             print("|  [5] Show Waiting Queue   : View prioritized queue   |")
-            print("|  [6] Daily Report         : View clinic statistics   |")
-            print("|  [7] Save Data Now        : Save database to JSON    |")
-            print("|  [8] Reset Clinic Data    : Clear all saved records  |")
-            print("|  [9] Quit (Auto-Save)     : Save data and exit       |")
+            print("|  [6] Toggle Doctor Status : Set available / busy     |")
+            print("|  [7] Delete Appointment   : Remove record (Delete)   |")
+            print("|  [8] Daily Report         : View clinic statistics   |")
+            print("|  [9] Save Data Now        : Save database to JSON    |")
+            print("|  [10] Reset Clinic Data   : Clear all saved records  |")
+            print("|  [11] Quit (Auto-Save)    : Save data and exit       |")
             print("+" + "-" * 54 + "+")
 
-            raw_choice = input("\nEnter choice (1-9): ").strip()
+            raw_choice = input("\nEnter choice (1-11): ").strip()
             choice = parse_menu_choice(raw_choice)
 
             if choice == "1":
@@ -751,6 +803,7 @@ def main():
                     # كارت بيانات التسجيل بنجاح مع إبراز الـ ID التلقائي
                     p_type_label = "Emergency (High Priority)" if p_type == "2" else "Regular"
                     print(f"\n[SUCCESS] Patient registered successfully!")
+                    print(f"  Profile: {new_p.display_profile()}")
                     print("+" + "-" * 54 + "+")
                     print("|" + "REGISTRATION DETAILS".center(54) + "|")
                     print("+" + "-" * 54 + "+")
@@ -820,8 +873,8 @@ def main():
                     manager.add_doctor(new_doc)
                     # حفظ فوري تلقائي
                     manager.save_to_file("clinic_data.json", silent=True)
-                    doc_title = new_doc.name if new_doc.name.lower().startswith("dr.") else f"Dr. {new_doc.name}"
-                    print(f"\n[SUCCESS] Added Doctor [{d_id}] - {doc_title} ({new_doc.specialty})\n")
+                    print(f"\n[SUCCESS] Doctor added successfully!")
+                    print(f"  Profile: {new_doc.display_profile()}\n")
                 except ClinicError as err:
                     print(f"\n[ERROR] Failed to add doctor: {err}\n")
 
@@ -834,13 +887,12 @@ def main():
                     print("\n[ERROR] No patients registered yet. Please register a patient first.\n")
                     continue
 
-                # عرض قائمة الدكاترة المتاحين بشكل مرتب ومحاذي
+                # عرض قائمة الدكاترة المتاحين باستخدام display_profile()
                 print("\nAvailable Doctors in Clinic:")
-                print("  " + "-" * 60)
+                print("  " + "-" * 75)
                 for d in manager.doctors.values():
-                    avail = "Available" if d.availability else "Unavailable"
-                    print(f"  * [{d.person_id}] Dr. {d.name:<18} | Specialty: {d.specialty:<15} [{avail}]")
-                print("  " + "-" * 60 + "\n")
+                    print(f"  * {d.display_profile()}")
+                print("  " + "-" * 75 + "\n")
 
                 # اختيار المريض
                 while True:
@@ -932,7 +984,7 @@ def main():
                         manager.save_to_file("clinic_data.json", silent=True)
                         print(f"\n[SUCCESS] Updated appointment [{idx}] status to '{updated.status.upper()}'.\n")
                         break
-                    except ValueError as err:
+                    except (ValueError, DuplicateBookingError) as err:
                         print(f"\n[ERROR] Update failed: {err}. Please try again.\n")
 
             elif choice == "5":
@@ -985,12 +1037,81 @@ def main():
                 print(sep + "\n")
 
             elif choice == "6":
-                manager.daily_report()
+                print_section_header("TOGGLE DOCTOR AVAILABILITY")
+                if not manager.doctors:
+                    print("\n[ERROR] No doctors registered in the clinic yet.\n")
+                    continue
+
+                print("\nCurrent Doctors in Clinic:")
+                print("  " + "-" * 75)
+                for d in manager.doctors.values():
+                    print(f"  * {d.display_profile()}")
+                print("  " + "-" * 75 + "\n")
+
+                while True:
+                    d_id = input("  Doctor ID      (e.g. doctor-101)  [or 'cancel' to exit]: ").strip()
+                    if d_id.lower() == "cancel":
+                        break
+                    if d_id not in manager.doctors:
+                        print(f"\n[ERROR] Doctor ID '{d_id}' not found in clinic. Please try again.\n")
+                        continue
+                    try:
+                        new_avail = manager.toggle_doctor_availability(d_id)
+                        manager.save_to_file("clinic_data.json", silent=True)
+                        doc = manager.doctors[d_id]
+                        status_str = "AVAILABLE" if new_avail else "UNAVAILABLE (Busy)"
+                        print(f"\n[SUCCESS] Dr. {doc.name} is now marked as {status_str}!")
+                        print(f"  Updated Profile: {doc.display_profile()}\n")
+                        break
+                    except ClinicError as err:
+                        print(f"\n[ERROR] Failed to toggle doctor availability: {err}\n")
+                        break
 
             elif choice == "7":
-                manager.save_to_file("clinic_data.json")
+                print_section_header("DELETE APPOINTMENT (One Delete Action)")
+                if not manager.appointments:
+                    print("\n[INFO] No appointments found in the system to delete.\n")
+                    continue
+
+                print("\nCurrent Appointments:")
+                print("  " + "-" * 75)
+                for idx, a in enumerate(manager.appointments):
+                    time_s = a.time.strftime("%Y-%m-%d %H:%M") if isinstance(a.time, datetime) else str(a.time)
+                    print(f"  [{idx}] Patient: {a.patient.person_id:<12} | Dr. {a.doctor.name:<15} | Time: {time_s} | Status: {a.status.upper()}")
+                print("  " + "-" * 75 + "\n")
+
+                while True:
+                    idx_input = input("  Appointment Index to DELETE [or 'cancel' to exit]: ").strip()
+                    if idx_input.lower() == "cancel":
+                        break
+                    try:
+                        idx = int(idx_input)
+                        if idx < 0 or idx >= len(manager.appointments):
+                            print(f"\n[ERROR] Index must be between 0 and {len(manager.appointments) - 1}. Please try again.\n")
+                            continue
+                        confirm = input(f"  Are you sure you want to permanently delete appointment [{idx}]? (yes/no): ").strip().lower()
+                        if confirm not in ("yes", "y", "نعم", "موافق", "confirm", "تاكيد"):
+                            print("\n[INFO] Deletion cancelled. Appointment was not deleted.\n")
+                            break
+
+                        deleted = manager.delete_appointment(idx)
+                        manager.save_to_file("clinic_data.json", silent=True)
+                        time_disp = deleted.time.strftime('%Y-%m-%d %H:%M') if isinstance(deleted.time, datetime) else str(deleted.time)
+                        print(f"\n[SUCCESS] Appointment [{idx}] deleted successfully!")
+                        print(f"  Patient Record : {deleted.patient.display_profile()}")
+                        print(f"  Doctor Record  : {deleted.doctor.display_profile()}")
+                        print(f"  Freed Slot     : {time_disp}\n")
+                        break
+                    except ValueError:
+                        print(f"\n[ERROR] '{idx_input}' is not a valid integer. Please try again.\n")
 
             elif choice == "8":
+                manager.daily_report()
+
+            elif choice == "9":
+                manager.save_to_file("clinic_data.json")
+
+            elif choice == "10":
                 print_section_header("RESET CLINIC DATA")
                 print("  WARNING: This will permanently delete ALL registered patients,")
                 print("  doctors, and scheduled appointments from memory and 'clinic_data.json'.\n")
@@ -1001,7 +1122,7 @@ def main():
                 else:
                     print(f"\n[INFO] Data reset cancelled. Your existing clinic records are intact.\n")
 
-            elif choice == "9":
+            elif choice == "11":
                 print("\n" + "-" * 54)
                 print(" Saving clinic database before exiting...")
                 manager.save_to_file("clinic_data.json", silent=True)
@@ -1012,7 +1133,7 @@ def main():
                 break
 
             else:
-                print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 9 (e.g. '1' or 'Register').\n")
+                print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 11 (e.g. '1' or 'Register').\n")
 
     except (KeyboardInterrupt, SystemExit):
         print("\n\n[INFO] Program interrupted. Auto-saving clinic database before exit...")
