@@ -1,120 +1,71 @@
-# الدليل التشريحي الشامل والتحليل التنفيذي لنظام العيادة الذكية (Smart Clinic Queue System)
-
-هذا المستند يقدم شرحاً تشريحياً حرفياً متكاملاً لكود ملف `main.py` سطرًا بسطر، وبالترتيب الفعلي الذي يتم فيه تنفيذ الكود في الذاكرة (Runtime / Run Order) من لحظة تشغيل البرنامج وحتى إغلاقه.
-
----
-
-## فهرس المحتويات
-1. [آلية بدء البرنامج وترتيب التنفيذ في الذاكرة (Runtime Architecture)](#1-آلية-بدء-البرنامج-وترتيب-التنفيذ-في-الذاكرة)
-2. [المرحلة الأولى: تحميل الموديول وبناء الهياكل البرمجية (Module Loading Phase)](#2-المرحلة-الأولى-تحميل-الموديول-وبناء-الهياكل-البرمجية)
-   - [المكتبات والاستدعاءات (Imports)](#المكتبات-والاستدعاءات-imports)
-   - [نظام الاستثناءات المخصصة (Custom Exceptions)](#نظام-الاستثناءات-المخصصة-custom-exceptions)
-   - [نظام الصلاحيات والمستخدمين (RBAC Architecture)](#نظام-الصلاحيات-والمستخدمين-rbac-architecture)
-   - [أدوات التحقق بالـ Regex ودوال المرونة (Validators & Parsers)](#أدوات-التحقق-بالـ-regex-ودوال-المرونة)
-   - [نماذج بيانات النظام البرمجية (OOP Domain Models)](#نماذج-بيانات-النظام-البرمجية-oop-domain-models)
-   - [الأدوات المتقدمة: الإيتريتور، الكلوزر، والعودية (Iterator, Closure & Recursion)](#الأدوات-المتقدمة-الإيتريتور-الكلوزر-والعودية)
-   - [كلاس المايسترو التنفيذي (ClinicManager)](#كلاس-المايسترو-التنفيذي-clinicmanager)
-3. [المرحلة الثانية: بدء التشغيل الفعلي وسيناريو التفاعل الكامل (Execution & CLI Lifecycle)](#3-المرحلة-الثانية-بدء-التشغيل-الفعلي-وسيناريو-التفاعل-الكامل)
-   - [نقطة الانطلاق (Entry Point)](#نقطة-الانطلاق-entry-point)
-   - [داخل دالة main() خطوة بخطوة](#داخل-دالة-main-خطوة-بخطوة)
-   - [تتبع الخيارات الـ 13 بالتفصيل الممل](#تتبع-الخيارات-الـ-13-بالتفصيل-الممل)
-4. [المخطط التنفيذي الشامل (Full Execution Trace: START → END)](#4-المخطط-التنفيذي-الشامل-full-execution-trace)
-5. [جدول العناصر البرمجية الشامل (Complete Reference Table)](#5-جدول-العناصر-البرمجية-الشامل)
-6. [قصة عمل البرنامج المتكاملة (The System Story)](#6-قصة-عمل-البرنامج-المتكاملة)
+# الدليل التشريحي والتعليمي الشامل لمشروع العيادة الذكية (Smart Clinic Queue System)
+## دليل التتبع التنفيذي خطوة بخطوة في الذاكرة (From RUN START to RUN END)
 
 ---
 
-## 1. آلية بدء البرنامج وترتيب التنفيذ في الذاكرة
+## المرحلة 1 — خريطة المشروع وتدفق البيانات قبل الضغط على Run
 
-عند تنفيذ الأمر `python main.py`، يمر مفسر بايثون (Python Interpreter) بمرحلتين أساسيتين:
+مشروعنا مبني بمعمارية **الملف الشامل (Single-File Architecture)**، حيث يحتوي الملف الرئيسي على كامل المنطق البرمجي، متصلاً بملفات التخزين والتقارير:
 
-1. **مرحلة التحميل والتعريف (Module Loading & Definition Phase):**
-   * يقرأ بايثون الملف تسلسلياً من السطر 1 حتى السطر الأخير.
-   * يقوم بتنفيذ أسطر `import` لحجز مساحات للمكتبات في الذاكرة.
-   * عند المرور على كلمة `class`، يُنشئ بايثون **Class Object** في الذاكرة ويربط دواله به كـ Attributes.
-   * عند المرور على كلمة `def`، يُنشئ بايثون **Function Object** ويخزن الكود الداخلي كـ Bytecode جاهز للتنفيذ دون الدخول فيه الآن.
-   * يقوم بتجميع تعبيرات الـ Regex وإنشاء القواميس العامة مثل `USERS_DB`.
+```text
+               [المستخدم في الـ Terminal]
+                          │
+                          ▼
+                      main.py  <── (الملف التنفيذي الشامل للكود)
+                     /        \
+                    ▼          ▼
+           clinic_data.json   daily_report.txt  <── (ملفات القرص الصلب)
+```
 
-2. **مرحلة التشغيل الفعلي (Execution Phase):**
-   * يصل المفسر إلى السطر 1479 ويجد شرط: `if __name__ == "__main__":`.
-   * نظراً لتشغيل الملف كبرنامج رئيسي، تكون قيمة `__name__` هي `"__main__"`، فيتحقق الشرط ويتم استدعاء `main()`.
-   * تبدأ حينها رحلة البرنامج التفاعلية من حجز كائن العيادة، تسجيل الدخول، تحميل قاعدة البيانات، وتشغيل حلقة القائمة الرئيسية.
+* **`main.py`**: هو الملف الوحيد الذي يبدأ منه وينتهي فيه البرنامج. يحتوي على كل الاستثناءات، الصلاحيات، الكلاسات، الفرز الطبي، الدوال العودية، وقائمة الأوامر.
+* **`clinic_data.json`**: ملف قاعدة البيانات الدائمة على الهارد ديسك؛ يقرأ منه `main.py` عند بدء التشغيل لاستعادة البيانات، ويكتب فيه تلقائياً بعد كل عملية.
+* **مسار التنفيذ المتوقع:** يبدأ المفسر بقراءة `main.py` من السطر الأول حتى الأخير لبناء الهياكل في الذاكرة، ثم يصل إلى نقطة الانطلاق `if __name__ == "__main__":`، فيستدعي `main()`، لتبدأ الشاشة التفاعلية.
 
 ---
 
-## 2. المرحلة الأولى: تحميل الموديول وبناء الهياكل البرمجية
+## المرحلة 2 — اضغط Run معي (التنفيذ الفعلي خطوة بخطوة)
 
-### المكتبات والاستدعاءات (Imports)
+```text
+============================================================
+                        RUN START
+============================================================
+```
 
-#### السطر 2:
+عند كتابة الأمر `python main.py` والضغط على Enter، لا يدخل المفسر مباشرة إلى دالة `main()`، بل يمر أولاً بمرحلة **تحميل الموديول وبناء الهياكل في الذاكرة (Module Loading & Definition Phase)**:
+
+---
+
+### الخطوة 1: استيراد المكتبات (Imports)
+
+#### السطور 2 - 8:
 ```python
 import json
-```
-* **ماذا يحدث؟** يستورد موديول `json` القياسي ويحمله في الـ Memory تحت المرجع `json`.
-* **لماذا؟** لتسجيل واسترجاع بيانات العيادة (المرضى، الأطباء، الكشوفات) من وإلى ملف بصيغة مهيكلة `clinic_data.json`.
-* **البيانات:** كود المكتبة المدمجة في بايثون.
-* **النتيجة:** Module Object في جدول الرموز العام (Global Symbol Table).
-* **بعده:** ينتقل للسطر 3.
-
-#### السطر 3:
-```python
 import os
-```
-* **ماذا يحدث؟** يستورد موديول التعامل مع نظام التشغيل والمسارات `os`.
-* **لماذا؟** للتحقق من وجود الملفات (`os.path.exists`)، معرفة حجم الملف (`os.path.getsize`) لمنع قراءة ملفات فارغة، وإنشاء المجلدات (`os.makedirs`).
-* **النتيجة:** Module Object باسم `os`.
-* **بعده:** ينتقل للسطر 4.
-
-#### السطر 4:
-```python
 import random
-```
-* **ماذا يحدث؟** يستورد موديول توليد الأرقام العشوائية `random`.
-* **لماذا؟** لتوليد معرفات (IDs) فريدة وتلقائية للمرضى والأطباء عبر `random.randint(1, 1000)`.
-* **النتيجة:** Module Object باسم `random`.
-* **بعده:** ينتقل للسطر 5.
-
-#### السطر 5:
-```python
 import re
-```
-* **ماذا يحدث؟** يستورد مكتبة التعبيرات النمطية (Regular Expressions) `re`.
-* **لماذا؟** للتحقق الصارم من صحة صياغة أرقام الهواتف ومعرفات المرضى والأطباء.
-* **النتيجة:** Module Object باسم `re`.
-* **بعده:** ينتقل للسطر 6.
-
-#### السطر 6:
-```python
 import shutil
-```
-* **ماذا يحدث؟** يستورد موديول العمليات المتقدمة على الملفات `shutil`.
-* **لماذا؟** لعمل نسخة احتياطية فورية (`.bak`) من قاعدة البيانات عند اكتشاف أي تلف في ملف الـ JSON لضمان عدم ضياع بيانات العيادة.
-* **النتيجة:** Module Object باسم `shutil`.
-* **بعده:** ينتقل للسطر 7.
-
-#### السطر 7:
-```python
 from functools import reduce
-```
-* **ماذا يحدث؟** يستورد دالة `reduce` تحديداً من موديول `functools`.
-* **لماذا؟** لحساب إجمالي الإيرادات المالية من المواعيد المكتملة عبر تجميع رسوم الكشوفات في قيمة رقمية تراكمية واحدة (Functional Programming).
-* **النتيجة:** تسجيل مؤشر دالة `reduce` في النطاق العام.
-* **بعده:** ينتقل للسطر 8.
-
-#### السطر 8:
-```python
 from datetime import datetime
 ```
-* **ماذا يحدث؟** يستورد كلاس `datetime` لإدارة التواريخ والأوقات.
-* **لماذا؟** لجدولة المواعيد، التحقق من أن الموعد في المستقبل، تسجيل الـ Timestamp في التقارير المصدرة، والتحويل بين النصوص وكائنات التاريخ.
-* **النتيجة:** تسجيل الكلاس `datetime` في الـ Globals.
-* **بعده:** ينتقل للسطر 14.
+
+* **البرنامج وصل للسطور دي.**
+* **ماذا يحدث الآن في الـ Memory؟**
+  1. يبحث بايثون في مكتباته المدمجة عن موديول `json` ويحمله في الذاكرة، ويضع متغيراً عاماً اسمه `json` يشير إليه.
+  2. يكرر نفس الشيء مع `os` (للتعامل مع مسارات الملفات وأحجامها).
+  3. يستورد `random` (لتوليد أرقام عشوائية).
+  4. يستورد `re` (للتحقق من الأنماط النصية Regex).
+  5. يستورد `shutil` (لنسخ الملفات احتياطياً).
+  6. في السطر 7: يدخل موديول `functools`، ولا يستورده كله، بل يستخرج منه دالة `reduce` فقط ويضعها في الذاكرة.
+  7. في السطر 8: يستخرج كلاس `datetime` من موديول `datetime`.
+* **البيانات:** كود بايثون الداخلي فقط.
+* **بعد التنفيذ:** أصبح لدينا 7 مراجع برمجية جاهزة للاستخدام في الذاكرة.
+* **ثم:** ينتقل للسطر 14.
 
 ---
 
-### نظام الاستثناءات المخصصة (Custom Exceptions)
+### الخطوة 2: تجهيز كلاسات الاستثناءات المخصصة (Custom Exceptions)
 
-#### الأسطر 14 - 41:
+#### السطور 14 - 41:
 ```python
 class ClinicError(Exception):
     pass
@@ -134,92 +85,45 @@ class DoctorNotFoundError(ClinicError):
 class InvalidFormatError(ClinicError):
     pass
 ```
-* **ماذا يحدث؟** يُنشئ بايثون ستة كلاسات استثناء في الذاكرة. الكلاس الأب هو `ClinicError` (يرث من `Exception`)، والخمسة الآخرون يرثون منه.
-* **لماذا؟** لبناء هرمية أخطاء مخصصة (Custom Exception Hierarchy) تمكننا من:
-  1. اصطياد أخطاء معينة بدقة مثل `DuplicateBookingError` لمعالجة تضارب المواعيد.
-  2. اصطياد كافة أخطاء النظام بكود موحد عبر `except ClinicError:`.
-  3. حماية البرنامج من الانهيار المفاجئ وعزل أخطاء النظام عن أخطاء لغة بايثون العامة.
-* **بعده:** ينتقل للسطر 48.
+
+* **البرنامج وصل للسطور دي.**
+* **ماذا يحدث الآن؟**
+  بايثون **لا يطلق أي خطأ الآن**! هو فقط يبني قوالب استثناءات مخصصة داخل الذاكرة:
+  ```text
+  Exception (كلاس بايثون الأصلي)
+      └── ClinicError (أب استثناءات العيادة)
+            ├── InvalidAppointmentTimeError
+            ├── DuplicateBookingError
+            ├── PatientNotFoundError
+            ├── DoctorNotFoundError
+            └── InvalidFormatError
+  ```
+* **لماذا؟** حتى نتمكن لاحقاً من رفع واصطياد أخطاء العيادة دون أن ينهار البرنامج.
+* **بعد التنفيذ:** الكلاسات مسجلة كأنواع في جدول الرموز العام (Global Symbol Table).
+* **ثم:** ينتقل للسطر 48.
 
 ---
 
-### نظام الصلاحيات والمستخدمين (RBAC Architecture)
+### الخطوة 3: تجهيز نظام الصلاحيات والمستخدمين (RBAC)
 
-#### الأسطر 48 - 63: كلاس `User` (Base Class)
+#### السطور 48 - 114:
 ```python
-class User:
-    def __init__(self, username: str, password: str, allowed_actions: set):
-        self.username = username
-        self.password = password
-        self.allowed_actions = allowed_actions
-
-    def has_permission(self, action: str) -> bool:
-        return action in self.allowed_actions
-
-    def display_role(self) -> str:
-        return "Generic User"
+class User: ...
+class AdminUser(User): ...
+class ReceptionistUser(User): ...
+class DoctorUser(User): ...
 ```
-* **ما هو؟** الكلاس الأب المجرد لجميع مستخدمي النظام.
-* **الـ Attributes:**
-  * `self.username`: اسم المستخدم (String).
-  * `self.password`: كلمة المرور (String).
-  * `self.allowed_actions`: مجموعة نصوص (`set`) بأسماء العمليات المسموح بها، وتتميز بالبحث فائق السرعة $O(1)$.
-* **الـ Methods:**
-  * `has_permission(action)`: تفحص هل العملية موجودة في مجموعة الصلاحيات وترجع `True` أو `False`.
-  * `display_role()`: ترجع مسمى الدور الوظيفي للمستخدم.
-* **بعده:** ينتقل للسطر 65.
 
-#### الأسطر 65 - 76: كلاس `AdminUser(User)`
-```python
-class AdminUser(User):
-    def __init__(self, username: str, password: str):
-        super().__init__(username, password, allowed_actions=set())
+* **البرنامج وصل للسطور دي.**
+* **ماذا يحدث في الذاكرة؟**
+  بايثون **لم ينشئ أي مستخدم (Object) حتى الآن**! هو فقط خزن في الذاكرة القواعد التالية:
+  * `User`: كلاس أساسي لديه ميثود `has_permission(action)`.
+  * `AdminUser`: ميثود `has_permission` عنده تعيد دائماً `True` (صلاحيات مطلقة).
+  * `ReceptionistUser`: لديه قائمة صلاحيات محددة `RECEPTIONIST_ACTIONS` (حجز، تسجيل، تقارير، ولكن لا يملك صلاحية حذف أو تصفير).
+  * `DoctorUser`: لديه `DOCTOR_ACTIONS` (معاينة الطابور، تحديث الكشف، وسجل المريض فقط).
+* **ثم:** ينتقل للسطر 117.
 
-    def has_permission(self, action: str) -> bool:
-        return True
-
-    def display_role(self) -> str:
-        return "Administrator"
-```
-* **ماذا يمثل؟** مدير النظام (Administrator).
-* **البوليمورفيزم (Polymorphism):** تم عمل Override لميثود `has_permission` لترجع دائماً وبشكل مطلق `True`، مما يمنحه كامل الصلاحيات دون استثناء (حذف، تصفير، حجز، تعديل، تصدير).
-* **بعده:** ينتقل للسطر 79.
-
-#### الأسطر 79 - 98: كلاس `ReceptionistUser(User)`
-```python
-class ReceptionistUser(User):
-    RECEPTIONIST_ACTIONS = {
-        "register_patient", "add_doctor", "book_appointment",
-        "update_visit_status", "view_queue", "toggle_doctor_availability",
-        "view_history", "export_report",
-    }
-
-    def __init__(self, username: str, password: str):
-        super().__init__(username, password, allowed_actions=self.RECEPTIONIST_ACTIONS)
-
-    def display_role(self) -> str:
-        return "Receptionist"
-```
-* **ماذا يمثل؟** موظف الاستقبال (Receptionist).
-* **الصلاحيات:** يمتلك صلاحيات العمليات اليومية التشغيلية فقط، وممنوع تماماً من العمليات الحساسة التدميرية (`delete_appointment` و `reset_database`).
-* **بعده:** ينتقل للسطر 100.
-
-#### الأسطر 100 - 114: كلاس `DoctorUser(User)`
-```python
-class DoctorUser(User):
-    DOCTOR_ACTIONS = {"view_queue", "update_visit_status", "view_history"}
-
-    def __init__(self, username: str, password: str):
-        super().__init__(username, password, allowed_actions=self.DOCTOR_ACTIONS)
-
-    def display_role(self) -> str:
-        return "Doctor"
-```
-* **ماذا يمثل؟** الطبيب (Doctor).
-* **الصلاحيات:** مسموح له فقط بمعاينة طابور الانتظار، تحديث حالة الكشف إلى مكتمل، واستعراض تاريخ المريض.
-* **بعده:** ينتقل للسطر 117.
-
-#### الأسطر 117 - 130: قاعدة بيانات المستخدمين `USERS_DB`
+#### السطور 117 - 130:
 ```python
 USERS_DB: dict[str, dict] = {
     "admin": {
@@ -236,437 +140,475 @@ USERS_DB: dict[str, dict] = {
     },
 }
 ```
-* **ماذا يحدث في الذاكرة؟** يُنشأ قاموس ثابت في النطاق العام يربط اسم المستخدم بكلمة سره ودالة مصنع مجهولة (`lambda factory`) تُنشئ كائن المستخدم المناسب فور تسجيل الدخول.
-* **بعده:** ينتقل للسطر 133.
 
-#### الأسطر 133 - 165: دوال تسجيل الدخول (`authenticate` و `login_screen`)
-* **`authenticate(username, password)` (الأسطر 133 - 139):**
-  * تنظف اسم المستخدم بـ `.strip().lower()` ليكون غير حساس لحالة الأحرف.
-  * تبحث في `USERS_DB.get(u_key)`. لو الحساب غير موجود أو الباسورد خطأ، ترفع `ClinicError("Invalid credentials...")`.
-  * لو سليم، تستدعي دالة المصنع `factory` وتنتج كائن المستخدم المطلوب.
-* **`login_screen()` (الأسطر 142 - 165):**
-  * تدير حلقة إدخال تفاعلية `while True` تعرض الحسابات الافتراضية، تستقبل البيانات، وتصطاد أي خطأ وتكرر المحاولة حتى ينجح تسجيل الدخول، ثم ترجع كائن المستخدم المسجل.
-* **بعده:** ينتقل للسطر 172.
+* **ماذا يحدث الآن؟**
+  يُنشئ بايثون قاموساً اسمه `USERS_DB` يحتوي على الحسابات الافتراضية، ومعه دالة مصنع صغيرة (`lambda`) مسؤولة عن إنتاج الـ Object المناسب عند تسجيل الدخول.
+* **الذاكرة:** `USERS_DB` أصبح متغيراً عاماً يحتوي على 3 حسابات جاهزة.
+* **ثم:** ينتقل للسطر 133 لتسجيل دالتي `authenticate` و `login_screen` كتعريفات في الذاكرة دون تنفيذهما الآن.
 
 ---
 
-### أدوات التحقق بالـ Regex ودوال المرونة
+### الخطوة 4: تجميع أنماط الـ Regex ودوال التحليل
 
-#### الأسطر 172 - 190: تجميع الأنماط ودوال الفحص
+#### السطور 172 - 190:
 ```python
 PATIENT_ID_PATTERN = re.compile(r"patient-[0-9]+")
 DOCTOR_ID_PATTERN = re.compile(r"doctor-[0-9]+")
 PHONE_PATTERN = re.compile(r"01[0-9]{9}")
 
-def validate_patient_id(patient_id: str) -> bool:
-    return bool(PATIENT_ID_PATTERN.fullmatch(patient_id.strip()))
-
-def validate_doctor_id(doctor_id: str) -> bool:
-    return bool(DOCTOR_ID_PATTERN.fullmatch(doctor_id.strip()))
-
-def validate_phone(phone: str) -> bool:
-    return bool(PHONE_PATTERN.fullmatch(phone.strip()))
+def validate_patient_id(patient_id: str) -> bool: ...
+def validate_doctor_id(doctor_id: str) -> bool: ...
+def validate_phone(phone: str) -> bool: ...
 ```
-* **التجميع المسبق (`re.compile`):** يحول النصوص النمطية إلى كائنات C-Level في الذاكرة لسرعة الفحص دون إعادة تفسيرها في كل استدعاء.
-* **الأنماط:**
-  * معرف المريض: يبدأ بـ `patient-` ويتبعه رقم واحد على الأقل.
-  * معرف الطبيب: يبدأ بـ `doctor-` ويتبعه رقم واحد على الأقل.
-  * رقم الهاتف: يبدأ بـ `01` ويتبعه 9 أرقام بالضبط (إجمالي 11 رقماً وهو نمط الهاتف المصري).
-* **بعده:** ينتقل للسطر 197.
 
-#### الأسطر 197 - 249: دوال التحليل النصي المرن (Parsers)
-* **`parse_patient_type(val)`:** تقبل `"1"` أو `"regular"` أو `"عادي"` للمريض العادي، و `"2"` أو `"emergency"` أو `"طوارئ"` لمريض الطوارئ.
-* **`parse_status(val)`:** تقبل الحالات بمختلف صيغها وترجع الصيغة المعيارية (`"pending"`, `"completed"`, `"cancelled"`, `"in_progress"`).
-* **`parse_menu_choice(val)`:** تدعم إدخال أرقام الخيارات من 1 إلى 13، أو الكلمات الدلالية المقابلة لها (مثل `"export"` و `"تصدير"` للخيار 12، أو `"history"` للخيار 13).
-* **بعده:** ينتقل للسطر 256.
+* **ماذا يحدث في الذاكرة؟**
+  يترجم بايثون نصوص الـ Regex مسبقاً عبر `re.compile()` إلى كائنات نمط مجمعة في الـ C-Level لضمان أقصى سرعة فحص.
+* **ثم:** يسجل دوال الفحص (`validate_*`) ودوال تحليل المدخلات المرنة (`parse_patient_type`, `parse_status`, `parse_menu_choice`).
+* **ثم:** ينتقل للسطر 256.
 
 ---
 
-### نماذج بيانات النظام البرمجية (OOP Domain Models)
+### الخطوة 5: تجهيز كلاسات الكيانات، الإيتريتور، الكلوزر، والدالة العودية
 
-#### الأسطر 256 - 271: كلاس `Person` (Base Class)
-```python
-class Person:
-    def __init__(self, person_id: str, name: str, phone: str):
-        if not validate_phone(phone):
-            raise InvalidFormatError(f"Invalid phone number '{phone}'. Must be 11 digits starting with 01.")
-        self.person_id = person_id.strip()
-        self.name = name.strip()
-        self.phone = phone.strip()
-
-    def display_profile(self) -> str:
-        return f"[{self.person_id}] {self.name} | Phone: {self.phone}"
-
-    def __str__(self) -> str:
-        return self.display_profile()
-```
-* **الوظيفة:** يمثل الكيان البشري الأساسي في العيادة.
-* **التحقق الفوري:** يفحص رقم الهاتف في `__init__` فوراً؛ إذا لم يكن 11 رقماً تبدأ بـ 01 يرفع `InvalidFormatError` لمنع وجود كائن غير صالح في الذاكرة.
-* **بعده:** ينتقل للسطر 273.
-
-#### الأسطر 273 - 291: كلاس `Patient(Person)`
-```python
-class Patient(Person):
-    def __init__(self, person_id: str, name: str, phone: str, age: int, case_type: str):
-        if not validate_patient_id(person_id):
-            raise InvalidFormatError(f"Invalid patient ID format: '{person_id}'. Expected 'patient-<number>'")
-        super().__init__(person_id, name, phone)
-        self.age = int(age)
-        self.case_type = case_type.strip()
-        self.visit_history: list = []
-
-    def display_profile(self) -> str:
-        return f"[{self.person_id}] {self.name} | Phone: {self.phone} | Age: {self.age} | Case: {self.case_type or 'General Checkup'}"
-
-    def priority_level(self) -> int:
-        return 2
-
-    def add_visit(self, visit):
-        self.visit_history.append(visit)
-```
-* **الوراثة والسمات:** يرث من `Person`، ويضيف `age` (العمر)، `case_type` (التشخيص)، و `visit_history` (قائمة كشوفات المريض).
-* **الـ Methods:** `priority_level()` ترجع الأولوية الافتراضية (2)، و `add_visit()` تضيف كشفاً جديداً لسجله.
-* **بعده:** ينتقل للسطر 294.
-
-#### الأسطر 294 - 312: كلاسات المرضى المتخصصة
-* **`EmergencyPatient(Patient)`:**
-  * تعيد تعريف `priority_level()` لترجع `1` (أولوية قصوى للحالات الحرجة).
-  * تعيد تعريف `display_profile()` لإضافة وسم `Priority: Emergency (High)`.
-* **`RegularPatient(Patient)`:**
-  * تحافظ على أولوية `2` العادية وتطبع وسم `Priority: Regular (Normal)`.
-* **بعده:** ينتقل للسطر 314.
-
-#### الأسطر 314 - 330: كلاس `Doctor(Person)`
-```python
-class Doctor(Person):
-    def __init__(self, person_id: str, name: str, phone: str, specialty: str, availability: bool = True):
-        if not validate_doctor_id(person_id):
-            raise InvalidFormatError(f"Invalid doctor ID format: '{person_id}'. Expected 'doctor-<number>'")
-        super().__init__(person_id, name, phone)
-        self.specialty = specialty.strip()
-        self.availability = availability
-
-    def display_profile(self) -> str:
-        status_str = "Available" if self.availability else "Unavailable"
-        doc_name = self.name if self.name.lower().startswith("dr.") else f"Dr. {self.name}"
-        return f"[{self.person_id}] {doc_name} | Phone: {self.phone} | Specialty: {self.specialty} | Status: [{status_str}]"
-
-    def toggle_availability(self):
-        self.availability = not self.availability
-```
-* **السمات:** `specialty` (التخصص)، و `availability` (هل الطبيب متاح لاستقبال المرضى أم مشغول).
-* **الميثودز:** `toggle_availability()` لتبديل حالة التوفر منطقياً بـ `not`.
-* **بعده:** ينتقل للسطر 332.
-
-#### الأسطر 332 - 350: كلاس `Appointment`
-* يربط بين كائن مريض وكائن طبيب وموعد `datetime` وحالة كشف ورسوم مالية.
-* يحتوي على ميثود `update_status(new_status)` لتغيير حالة الكشف نصياً، وميثود `__str__` لتنسيق الموعد عند الطباعة.
-* **بعده:** ينتقل للسطر 356.
+#### السطور 256 - 416:
+* يمر المفسر على:
+  * `Person` (الأب الأساسي الذي يتحقق من الهاتف فوراً).
+  * `Patient`, `EmergencyPatient`, `RegularPatient` (المرضى وتحديد درجات الأولوية 1 للطوارئ و 2 للعادي).
+  * `Doctor`, `Appointment`.
+  * `WaitingQueueIterator` (كاستم إيتريتور يطبق بروتوكول `__iter__` و `__next__`).
+  * `make_triage_calculator` (مصنع الكلوزر مع متغير `nonlocal`).
+  * `find_visits_recursive` (الدالة العودية لاستخراج الكشوفات المكتملة بدون أي loops).
+* **تأثير الذاكرة:** كلها أصبحت تعريفات (Definitions) مسجلة كقوالب. لا يوجد مريض واحد ولا كشف واحد تم إنشاؤه في الذاكرة حتى الآن!
+* **ثم:** يمر على كلاس `ClinicManager` (السطور 423 - 948) ويسجل دواله.
+* **ثم:** يمر على دالة `main()` (السطور 960 - 1472) ويسجلها كدالة.
+* **ثم:** يصل أخيراً إلى السطر 1479!
 
 ---
 
-### الأدوات المتقدمة: الإيتريتور، الكلوزر، والعودية
+### الخطوة 6: نقطة الانطلاق وبداية التشغيل الفعلي (Entry Point)
 
-#### الأسطر 356 - 371: كلاس `WaitingQueueIterator` (Custom Iterator)
-```python
-class WaitingQueueIterator:
-    def __init__(self, appointments: list):
-        self._appointments = appointments
-        self._index = 0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self._index >= len(self._appointments):
-            raise StopIteration
-        current_appointment = self._appointments[self._index]
-        self._index += 1
-        return current_appointment
-```
-* **التطبيق الهندسي:** يطبق بروتوكول التكرار في بايثون (`__iter__` و `__next__`).
-* **الآلية:** يتحرك على عناصر القائمة عبر مؤشر `_index`. إذا وصل للنهاية يرفع `StopIteration`، مما يسمح باستخدامه مباشرة داخل حلقات `for` للمرور على طابور الانتظار عنصرًا تلو الآخر.
-* **بعده:** ينتقل للسطر 374.
-
-#### الأسطر 374 - 401: دالة `make_triage_calculator` (Closure with `nonlocal`)
-```python
-def make_triage_calculator(base_fee: float = 100.0, initial_emergency_count: int = 0):
-    emergency_count = initial_emergency_count
-
-    def calculate(patient: Patient) -> float:
-        nonlocal emergency_count
-        if patient.priority_level() == 1:
-            emergency_count += 1
-            return float(base_fee * 1.5)
-        return float(base_fee)
-
-    def get_emergency_count() -> int:
-        return emergency_count
-
-    def decrement_emergency_count() -> int:
-        nonlocal emergency_count
-        if emergency_count > 0:
-            emergency_count -= 1
-        return emergency_count
-
-    def reset_count():
-        nonlocal emergency_count
-        emergency_count = 0
-
-    calculate.get_emergency_count = get_emergency_count
-    calculate.decrement_emergency_count = decrement_emergency_count
-    calculate.reset_count = reset_count
-    return calculate
-```
-* **المفهوم البرمجي للـ Closure:**
-  * دالة حاضنة تحتفظ بمتغير محلي `emergency_count`.
-  * الدوال الداخلية تحتفظ بالوصول إلى هذا المتغير في الذاكرة حتى بعد خروج الدالة الخارجية من مكدس الاستدعاءات (Call Stack).
-  * كلمة `nonlocal` تسمح بتعديل المتغير الأصلي في النطاق الأب.
-* **الدوال الملحقة (Function Attributes):**
-  * `calculate(patient)`: تزيد عداد الطوارئ بحالة الطوارئ وتحسب الرسوم بزيادة 50% ($150.0) أو السعر العادي ($100.0).
-  * `get_emergency_count()`: ترجع العدد الحالي لحالات الطوارئ.
-  * `decrement_emergency_count()`: تنقص العداد بمقدار 1 عند حذف كشف طوارئ لضمان دقة الحسابات.
-  * `reset_count()`: تصفير العداد عند تصفير العيادة.
-* **بعده:** ينتقل للسطر 404.
-
-#### الأسطر 404 - 416: دالة `find_visits_recursive` (Pure Recursion)
-```python
-def find_visits_recursive(visits: list, index: int = 0) -> list:
-    if index >= len(visits):
-        return []
-
-    current_visit = visits[index]
-    remaining_visits = find_visits_recursive(visits, index + 1)
-
-    if current_visit.status == "completed":
-        return [current_visit] + remaining_visits
-    return remaining_visits
-```
-* **المفهوم:** دالة عودية نقية لاستخراج المواعيد المكتملة بدون أي استخدام لحلقات التكرار (`for` أو `while`).
-* **حالة التوقف (Base Case):** عندما يتجاوز الـ Index طول القائمة `index >= len(visits)`، ترجع قائمة فارغة `[]` ويبدأ الارتداد العكسي.
-* **الخطوة العودية (Recursive Step):** تفحص الموعد الحالي؛ إذا كان مكتملًا تضيفه إلى ناتج استدعاء نفسها على باقي العناصر `[current_visit] + remaining_visits`.
-* **بعده:** ينتقل للسطر 423.
-
----
-
-### كلاس المايسترو التنفيذي `ClinicManager`
-
-#### الأسطر 423 - 439: التهيئة والسمات
-* **`self.patients`:** قاموس `{patient_id: Patient}` للبحث السريع $O(1)$.
-* **`self.doctors`:** قاموس `{doctor_id: Doctor}`.
-* **`self.appointments`:** قائمة بجميع كائنات `Appointment`.
-* **`self.booked_date`:** قاموس `{doctor_id: [datetime]}` يسجل المواعيد المحجوزة لكل طبيب لمنع التضارب.
-* **`self.fee_calculator`:** كائن الكلوزر لحساب الأسعار وتتبع الطوارئ.
-* **`self.current_user`:** كائن المستخدم الحالي لتطبيق صلاحيات الـ RBAC.
-* **`self._visit_lookup_cache`:** قاموس التخزين المؤقت للبحث العودي (Memoization Cache).
-
-#### الأسطر 443 - 613: العمليات التشغيلية المحمية بالصلاحيات
-* **`register_patient` و `add_doctor` و `toggle_doctor_availability`:**
-  * تفحص أولاً صلاحية المستخدم الحالي عبر `self.current_user.has_permission(...)`.
-  * تمنع التكرار وتخزن الكائنات في القواميس.
-* **`book_appointment`:**
-  * تفحص الصلاحية ووجود المريض والطبيب.
-  * تتأكد أن التاريخ والوقت في المستقبل.
-  * تتأكد أن الطبيب متاح (`availability == True`).
-  * تمنع حجز الطبيب في نفس الوقت وتمنع حجز المريض لموعدين في نفس الوقت.
-  * تحسب الرسوم بالكلوزر وتضيف الحجز لقوائم المواعيد وسجل المريض.
-  * **إبطال الكاش (Cache Invalidation):** تحذف كاش المريض فوراً `self._visit_lookup_cache.pop(patient_id, None)`.
-* **`update_visit_status`:**
-  * تفحص الصلاحية وتغير حالة الكشف.
-  * تعالج تحرير وقت الطبيب عند الإلغاء، أو إعادة حجز الموعد إذا أُعيد تفعيله بعد التأكد من عدم شغله لمريض آخر.
-  * تبطل كاش المريض فوراً.
-* **`delete_appointment`:**
-  * محصورة بالأدمن فقط.
-  * تحذف الموعد، تحرر وقت الطبيب، تحذفه من سجل المريض، **وتنقص عداد الطوارئ في الكلوزر تلقائياً إذا كان المريض حالة طوارئ**، وتبطل الكاش.
-
-#### الأسطر 617 - 636: الأدوات الوظيفية (Functional Tools)
-* **`get_emergency_patients()`:** فلترة بـ `filter(lambda p: p.priority_level() == 1, self.patients.values())`.
-* **`sort_queue_by_priority()`:** ترتيب بـ `sorted` بمفتاح مركب `(priority, time)` ليأتي مرضى الطوارئ أولاً، ثم الأقدم حجزاً.
-* **`get_waiting_queue_iterator()`:** تغليف القائمة المرتبة داخل كائن `WaitingQueueIterator`.
-* **`calculate_total_revenue()`:** تجميع إجمالي رسوم الكشوفات المكتملة بـ `reduce`.
-
-#### الأسطر 640 - 728: ميزة تصدير التقرير ومبدأ DRY (Feature 1)
-* **`_compute_report_metrics()`:** تجمع كافة إحصائيات النظام في قاموس موحد منعاً لتكرار الكود.
-* **`_format_report_table(report, timestamp=None)`:** تنسق جدول التقرير داخل فريم بعرض 56 حرفاً مع إضافة الـ Timestamp.
-* **`daily_report()`:** تطبع التقرير في الكونسول مباشرة.
-* **`export_report_to_file(path="daily_report.txt")`:** تفحص الصلاحية، تولد الـ Timestamp الحالي، وتكتب الجدول في ملف نصي مع معالجة الأخطاء بكتلة `try/except` وطباعة `[SUCCESS]` أو `[ERROR]`.
-
-#### الأسطر 732 - 753: سجل المريض العودي المخزن مؤقتاً (Feature 3: Memoization)
-* **`get_patient_completed_visits(patient_id, return_status=False)`:**
-  * تفحص صلاحية `"view_history"`.
-  * **فحص الكاش:** إذا كان المريض مسجلاً في `self._visit_lookup_cache`، ترجع النتيجة فوراً بـ $O(1)$ مع وسم `is_cache_hit = True`.
-  * **في حال عدم وجوده:** تستدعي الدالة العودية `find_visits_recursive`، تحفظ النتيجة في الكاش، وترجعها مع وسم `is_cache_hit = False`.
-
-#### الأسطر 757 - 946: التخزين الدائم والاسترداد التلقائي (JSON Persistence)
-* **`save_to_file(path, silent=False)`:** حفظ كامل قاعدة البيانات في ملف JSON مع دعم اللغة العربية.
-* **`load_from_file(path)`:**
-  * لو الملف غير موجود: تنشئه تلقائياً بهيكل فارغ نظيف.
-  * لو الملف تالف أو فارغ: تأخذ منه نسخة احتياطية `.bak` وتنشئ ملفاً جديداً لضمان عدم توقف النظام أبداً.
-  * تعيد بناء كافة الكائنات في الذاكرة مع إعادة بناء جدول أوقات الأطباء ومزامنة عداد الطوارئ في الكلوزر.
-* **`reset_database(path)`:** تفحص صلاحية الأدمن، وتصفر الذاكرة والملف بالكامل.
-
----
-
-## 3. المرحلة الثانية: بدء التشغيل الفعلي وسيناريو التفاعل الكامل
-
-### نقطة الانطلاق (Entry Point)
-
-#### الأسطر 1479 - 1481:
+#### السطور 1479 - 1480:
 ```python
 if __name__ == "__main__":
     main()
 ```
-* بايثون يتحقق من المتغير الخاص `__name__`، ويجد قيمته مساوية لـ `"__main__"` لأن الملف تم تشغيله كبرنامج رئيسي، فيبدأ فوراً في تنفيذ دالة `main()`.
+
+* **البرنامج وصل للسطر ده.**
+* **ماذا يحدث الآن؟**
+  بايثون يفحص المتغير الخاص الداخلي `__name__`.
+  * بما أننا شغلنا الملف مباشرة، فإن `__name__ == "__main__"` قيمته `True`.
+* **الـ Call Stack الآن:**
+  ```text
+  [Global Scope]
+      ↓
+  CALL main()
+  ```
+* **الانتقال:** يقفز مؤشر التنفيذ مباشرة إلى **السطر 960 داخل دالة `main()`**!
 
 ---
 
-### داخل دالة `main()` خطوة بخطوة
+## المرحلة 3 — داخل دالة `main()` وتتبع الذاكرة والسيناريوهات
 
-1. **السطر 961: تهيئة مدير العيادة:**
-   ```python
-   manager = ClinicManager(base_fee=100.0)
-   ```
-   يُنشأ كائن `ClinicManager` في الذاكرة ويجهز القواميس وقوائم المواعيد ومصنع الكلوزر.
-
-2. **الأسطر 964 - 965: تسجيل الدخول وتثبيت الصلاحيات:**
-   ```python
-   current_user = login_screen()
-   manager.set_current_user(current_user)
-   ```
-   * يُطلب اسم المستخدم وكلمة المرور من الكونسول.
-   * يتم التحقق واسترجاع كائن المستخدم المناسب (`AdminUser` أو `ReceptionistUser` أو `DoctorUser`).
-   * يتم ربط الكائن بمدير النظام طوال الجلسة لضبط الصلاحيات.
-
-3. **السطر 968: استرجاع البيانات المحفوظة:**
-   ```python
-   manager.load_from_file("clinic_data.json")
-   ```
-   يتم تحميل البيانات من القرص الصلب إلى الذاكرة ومزامنة العدادات تلقائياً.
-
-4. **الأسطر 970 - 1472: حلقة القائمة الرئيسية `while True`:**
-   * يعرض رأس القائمة دور المستخدم الحالي: `menu_title = f"CLINIC MAIN MENU - {current_user.display_role()}"`.
-   * تُطبع الخيارات الـ 13 بالتفصيل.
-   * يستقبل البرنامج إدخال المستخدم ويمرره لـ `parse_menu_choice`.
+نحن الآن داخل دالة `main()`، وسنتتبع كل خطوة بالتفصيل الدقيق:
 
 ---
 
-### تتبع الخيارات الـ 13 بالتفصيل الممل
+### الخطوة 7: إنشاء كائن مدير العيادة `ClinicManager`
 
-* **[1] تسجيل مريض (Register Patient):**
-  يفحص صلاحية `"register_patient"`، يستقبل نوع المريض (1 عادي، 2 طوارئ)، الاسم، الهاتف (11 رقماً تبدأ بـ 01)، العمر، والتشخيص. يولد المعرف تلقائياً، ينشئ كائن المريض، يحفظه في الـ JSON، ويطبع كارت المريض المنسق.
-* **[2] إضافة طبيب (Add Doctor):**
-  يفحص صلاحية `"add_doctor"`، يستقبل المعرف أو يولده تلقائياً، الاسم، الهاتف، والتخصص، وينشئ كائن الطبيب ويحفظه في الـ JSON.
-* **[3] حجز موعد (Book Appointment):**
-  يفحص صلاحية `"book_appointment"`، يعرض الأطباء المتاحين بملفاتهم الشخصية `display_profile()`، يستقبل بيانات الحجز، يتحقق من التوفر وعدم التعارض، يحسب الرسوم بالكلوزر، يبطل كاش المريض، ويحفظ البيانات.
-* **[4] تحديث حالة الكشف (Update Visit Status):**
-  يفحص الصلاحية، يستقبل رقم الموعد والحالة الجديدة، يغير الحالة، يحرر أو يحجز وقت الطبيب، ويبطل كاش المريض.
-* **[5] عرض طابور الانتظار (Show Waiting Queue):**
-  يستخرج كائن `WaitingQueueIterator` لطابور الحالات المنتظرة مرتبة بالأولوية والوقت، ويمر عليها بحلقة `for` مع تمييز حالات الطوارئ بـ `[!] EMERGENCY`.
-* **[6] تبديل حالة الطبيب (Toggle Doctor Status):**
-  يفحص الصلاحية، ويعكس حالة توفر الطبيب بين متاح ومشغول.
-* **[7] حذف موعد (Delete Appointment):**
-  مسموح للأدمن فقط ومرفوض لغيره. يطلب تأكيد الحذف، يحذف الكشف، يحرر موعد الطبيب، يمسح الكشف من سجل المريض، **وينقص عداد الطوارئ في الكلوزر تلقائياً إذا كان طوارئ**، ويبطل الكاش.
-* **[8] التقرير اليومي (Daily Report):**
-  يحسب الإحصائيات ويطبع جدول التقرير اليومي والإيرادات المالية في الكونسول.
-* **[9] حفظ البيانات الآن (Save Data Now):**
-  يكتب كافة البيانات الحالية في ملف `clinic_data.json`.
-* **[10] تصفير بيانات العيادة (Reset Clinic Data):**
-  للأدمن فقط. يطلب تأكيداً صريحاً، ويقوم بمسح كافة السجلات من الذاكرة والملف وتصفير عداد الكلوزر والكاش.
-* **[11] الخروج مع الحفظ التلقائي (Quit):**
-  يحفظ قاعدة البيانات تلقائياً، يطبع رسالة وداع، ويكسر الحلقة بـ `break`.
-* **[12] تصدير التقرير إلى ملف نصي (Export Daily Report):**
-  يفحص الصلاحية، يستقبل مسار الملف (افتراضياً `daily_report.txt`)، وينشئ الملف متضمناً الـ Timestamp والجدول المنسق بدقة.
-* **[13] استعراض تاريخ المريض مع التخزين المؤقت (Patient History):**
-  يفحص الصلاحية، يستقبل ID المريض، ويستدعي `get_patient_completed_visits` لطباعة الكشوفات المكتملة فقط مع إظهار `[CACHE HIT]` أو `[COMPUTED]`.
-* **الحماية من المقاطعة الفجائية (Interrupt Protection):**
-  إذا ضغط المستخدم `Ctrl + C` في أي وقت، تصطاد كتلة `except (KeyboardInterrupt, SystemExit):` الحدث وتقوم بحفظ البيانات تلقائياً قبل الخروج لمنع ضياع أي ملفات.
-
----
-
-## 4. المخطط التنفيذي الشامل (Full Execution Trace)
-
-```
-[START: تشغيل البرنامج]
-   │
-   ▼
-[تحميل واستيراد المكتبات: json, os, random, re, shutil, functools.reduce, datetime]
-   │
-   ▼
-[بناء هرمية الاستثناءات في الذاكرة: ClinicError ومشتقاتها الخمسة]
-   │
-   ▼
-[بناء نظام الصلاحيات: User, AdminUser, ReceptionistUser, DoctorUser, USERS_DB]
-   │
-   ▼
-[تجميع أنماط Regex وحفظ دوال التحقق ودوال تحليل المدخلات]
-   │
-   ▼
-[بناء نماذج البيانات: Person, Patient, EmergencyPatient, RegularPatient, Doctor, Appointment]
-   │
-   ▼
-[بناء الأدوات المتقدمة: WaitingQueueIterator, make_triage_calculator, find_visits_recursive]
-   │
-   ▼
-[بناء كلاس ClinicManager بكافة دواله الإدارية والتقارير والكاش والملفات]
-   │
-   ▼
-[التحقق من شرط __name__ == '__main__' -> استدعاء main()]
-   │
-   ▼
-[داخل main: إنشاء كائن manager = ClinicManager(100.0)]
-   │
-   ▼
-[استدعاء login_screen() -> التحقق من المستخدم وتعيين الصلاحيات عبر set_current_user]
-   │
-   ▼
-[استدعاء manager.load_from_file('clinic_data.json') -> استرجاع البيانات ومزامنة العدادات]
-   │
-   ▼
-[دخول حلقة while True -> طباعة القائمة الرئيسية مع عرض الدور الوظيفي للمستخدم]
-   │
-   ├─► اختيار [1 - 4]: إدارة المرضى، الأطباء، والمواعيد مع الحفظ التلقائي وإبطال الكاش.
-   ├─► اختيار [5 - 6]: عرض الطابور عبر الإيتريتور أو تبديل توفر الأطباء.
-   ├─► اختيار [7]: حذف موعد مع تحرير الوقت وتنقيص عداد الطوارئ في الكلوزر (Admin فقط).
-   ├─► اختيار [8 - 10]: التقارير، الحفظ اليدوي، أو تصفير البيانات (Admin فقط).
-   ├─► اختيار [12]: تصدير التقرير لملف نصي بـ Timestamp عبر دالة export_report_to_file.
-   ├─► اختيار [13]: استعراض زيارات المريض المكتملة بالدالة العودية مع التخزين المؤقت (Cache Hit/Computed).
-   └─► اختيار [11]: الحفظ التلقائي للبيانات والخروج النظيف من البرنامج بـ break.
-   │
-   ▼
-[END: إنهاء البرنامج بسلام وحفظ كامل البيانات]
+#### السطر 961:
+```python
+manager = ClinicManager(base_fee=100.0)
 ```
 
+* **ماذا يحدث خطوة بخطوة؟**
+  1. بايثون يستدعي كلاس `ClinicManager`.
+  2. يُحجز كائن جديد في الـ Heap، ويُمرر مرجعه إلى `__init__` كمعامل `self` مع تمرير `base_fee = 100.0`.
+  3. **داخل `__init__` (السطر 426):**
+     * `self.patients = {}`: قاموس فارغ للمرضى.
+     * `self.doctors = {}`: قاموس فارغ للأطباء.
+     * `self.appointments = []`: قائمة فارغة للمواعيد.
+     * `self.booked_date = {}`: قاموس فارغ لجدول أوقات الأطباء (Instance Attribute).
+     * `self.fee_calculator = make_triage_calculator(base_fee=100.0)`:
+       * يدخل دالة `make_triage_calculator` (السطر 374).
+       * يُنشأ متغير مغلق عليه في الـ Enclosing Scope اسمه `emergency_count = 0`.
+       * ترجع الدالة الداخلية `calculate` ومحمل بها دوال التحكم بالعداد (`decrement_emergency_count`, إلخ).
+     * `self.current_user = None`: لا يوجد مستخدم حالي بعد.
+     * `self._visit_lookup_cache = {}`: قاموس التخزين المؤقت (Memoization) فارغ.
+  4. يرجع الكائن المكتمل، ويتم تخزينه في المتغير المحلي `manager` داخل `main()`.
+
+* **حالة الذاكرة بعد الخطوة 7:**
+  ```text
+  manager (ClinicManager Object)
+    ├── patients: {}
+    ├── doctors: {}
+    ├── appointments: []
+    ├── fee_calculator: (Closure with emergency_count = 0)
+    ├── _visit_lookup_cache: {}
+    └── current_user: None
+  ```
+
 ---
 
-## 5. جدول العناصر البرمجية الشامل
+### الخطوة 8: شاشة تسجيل الدخول (Authentication)
 
-| العنصر البرمجي | النوع | مكانه في الكود | وظيفته الهندسية | البيانات التي يستقبلها | مصدر البيانات | ماذا ينتج / يرجع |
+#### السطر 964:
+```python
+current_user = login_screen()
+```
+
+* **الـ Call Stack:**
+  ```text
+  main()
+    ↓
+  login_screen() (السطر 142)
+  ```
+* **ماذا يحدث؟**
+  1. يطبع البرنامج فريم شاشة الدخول والحسابات الافتراضية.
+  2. يدخل حلقة `while True:` وكتلة `try:`.
+  3. يقف البرنامج عند السطر 156: `username = input("
+  Username: ").strip()`.
+
+---
+
+#### سيناريو الدخول A (كلمة مرور خاطئة -> حدوث Exception واصطياده):
+المستخدم يكتب:
+* `Username:` `"admin"`
+* `Password:` `"wrong123"`
+
+**تتبع التنفيذ:**
+```text
+username = "admin"
+password = "wrong123"
+  ↓
+استدعاء authenticate("admin", "wrong123") (السطر 133)
+  ↓
+داخل authenticate:
+u_key = "admin"
+user_record = USERS_DB.get("admin") -> وجد السجل!
+user_record["password"] -> "admin123"
+مقارنة: "admin123" != "wrong123" -> الشرط True!
+  ↓
+السطر 138:
+raise ClinicError("Invalid credentials. Please check username and password.")
+```
+
+* **لحظة الـ `raise`:**
+  1. يتم إنشاء كائن استثناء من نوع `ClinicError`.
+  2. يتوقف تنفيذ `authenticate` فوراً.
+  3. يرجع بايثون للخلف في الـ Call Stack باحثاً عن `except`.
+  4. في `login_screen()` يجد:
+     ```python
+     except ClinicError as err:
+         print(f"
+[ERROR] {err} Try again.")
+     ```
+  5. يطبع على الشاشة:
+     `[ERROR] Invalid credentials. Please check username and password. Try again.`
+  6. **البرنامج لم يتوقف أو ينهار!** بل يعود لحلقة `while True` ويطلب الإدخال مجدداً.
+
+---
+
+#### سيناريو الدخول B (تسجيل دخول صحيح بنجاح):
+المستخدم يكتب:
+* `Username:` `"admin"`
+* `Password:` `"admin123"`
+
+**تتبع التنفيذ:**
+```text
+authenticate("admin", "admin123")
+  ↓
+user_record["password"] == "admin123" -> سليم!
+  ↓
+السطر 139:
+return user_record["factory"]("admin", "admin123")
+  ↓
+تستدعى Lambda -> AdminUser("admin", "admin123")
+  ↓
+ينشأ Object من كلاس AdminUser:
+  - username = "admin"
+  - password = "admin123"
+  - has_permission = دائماً True
+  ↓
+return user إلى login_screen()
+  ↓
+يطبع: [SUCCESS] Welcome, Administrator (admin)!
+  ↓
+return user إلى main()
+```
+
+* **العودة إلى `main()` (السطور 964 - 965):**
+  ```python
+  current_user = user  # أصبح نوعه AdminUser
+  manager.set_current_user(current_user)  # تم ربط صلاحيات الأدمن بمدير العيادة
+  ```
+
+---
+
+### الخطوة 9: استرجاع قاعدة البيانات التلقائي (Load Data)
+
+#### السطر 968:
+```python
+manager.load_from_file("clinic_data.json")
+```
+
+* **تتبع مسار الملف:**
+  1. يفتح الملف `clinic_data.json` ويقرأ محتوياته عبر `json.load(f)`.
+  2. يعيد بناء كائنات المرضى (`EmergencyPatient` أو `RegularPatient`) ويضعها في قاموس `self.patients`.
+  3. يعيد بناء كائنات الأطباء والمواعيد، ويعيد بناء جدول أوقات الدكاترة `self.booked_date`.
+  4. **السطر 930: مزامنة عداد الطوارئ في الكلوزر:**
+     ```python
+     loaded_emergency_count = sum(1 for a in self.appointments if a.patient.priority_level() == 1)
+     self.fee_calculator = make_triage_calculator(base_fee=100.0, initial_emergency_count=loaded_emergency_count)
+     ```
+     يقوم بعدّ حالات الطوارئ المخزنة فعلياً، ويعيد تهيئة الكلوزر ليبدأ العداد من الرقم الصحيح!
+  5. يطبع رسالة النجاح: `[SUCCESS] Loaded data successfully...`.
+  6. يعود إلى `main()`.
+
+---
+
+## المرحلة 4 — حلقة القائمة الرئيسية والسيناريوهات التفاعلية
+
+البرنامج الآن في السطر 971 داخل حلقة `while True:`:
+* يعرض عنوان القائمة شاملاً رتبة المستخدم: `CLINIC MAIN MENU - Administrator`.
+* يطبع الخيارات الـ 13.
+* ينتظر إدخال المستخدم: `choice = parse_menu_choice(input())`.
+
+---
+
+### سيناريو كامل 1: حجز موعد جديد ( الخيار 3 )
+
+المستخدم يدخل `3`.
+
+1. **فحص الصلاحية (السطر 1146):**
+   `current_user.has_permission("book_appointment")` ترجع `True` لأن المستخدم أدمن.
+2. **عرض الدكاترة:** يمر على `manager.doctors` ويطبع ملفاتهم بـ `display_profile()`.
+3. **إدخال البيانات:**
+   * المريض: `patient-238`.
+   * الطبيب: `doctor-101`.
+   * الوقت: `2026-10-15 14:00`.
+4. **تنفيذ الحجز داخل `manager.book_appointment` (السطر 496):**
+   * يحول النص لكائن `datetime`.
+   * يفحص هل الوقت في المستقبل: `True`.
+   * يفحص عدم تكرار الطبيب والمريض: `True`.
+   * **حساب الرسوم بالكلوزر (السطر 537):**
+     `new_appt.fee = self.fee_calculator(target_patient)`
+     إذا كان المريض عادياً ترجع `100.0`، ولو كان طوارئ لزاد العداد ورجع `150.0`.
+   * يضيف الحجز لـ `booked_date` وقائمة `appointments` وسجل المريض `visit_history`.
+   * **إبطال الكاش (Cache Invalidation - السطر 545):**
+     `self._visit_lookup_cache.pop(patient_id, None)`
+     تم مسح سجل المريض من الكاش لتحديثه لاحقاً!
+5. **الحفظ التلقائي:** يستدعي `manager.save_to_file("clinic_data.json", silent=True)`.
+6. يطبع تفاصيل الحجز بنجاح.
+
+---
+
+### سيناريو كامل 2: سجل المريض مع الدالة العودية والتخزين المؤقت ( الخيار 13 )
+
+المستخدم يدخل `13`.
+
+#### المرة الأولى (الحساب الفعلي - COMPUTED):
+1. يدخل كود المريض: `patient-238`.
+2. يستدعي: `manager.get_patient_completed_visits("patient-238", return_status=True)`.
+3. **داخل الدالة (السطر 732):**
+   * يفحص الكاش: `if "patient-238" in self._visit_lookup_cache:` -> `False`.
+   * يستدعي الدالة العودية: `find_visits_recursive(patient.visit_history, 0)`.
+4. **تتبع الدالة العودية `find_visits_recursive` في الذاكرة:**
+   لنفترض أن المريض لديه زيارتان: [زيارة 0 مكتملة، زيارة 1 معلقة].
+   ```text
+   الاستدعاء 1: find_visits_recursive(visits, index=0)
+       index (0) < 2
+       current_visit = visits[0] (completed)
+       يستدعي: find_visits_recursive(visits, index=1)
+           │
+           ▼
+   الاستدعاء 2: find_visits_recursive(visits, index=1)
+       index (1) < 2
+       current_visit = visits[1] (pending)
+       يستدعي: find_visits_recursive(visits, index=2)
+           │
+           ▼
+   الاستدعاء 3 (Base Case): find_visits_recursive(visits, index=2)
+       index (2) >= 2 -> تحقق شرط التوقف!
+       return []
+           │
+           ▼
+   الارتداد للاستدعاء 2:
+       الحالة pending -> return []
+           │
+           ▼
+   الارتداد للاستدعاء 1:
+       الحالة completed -> return [visits[0]] + [] -> [visits[0]]
+   ```
+5. **تخزين النتيجة في الكاش:**
+   `self._visit_lookup_cache["patient-238"] = [visits[0]]`
+   `is_hit = False`
+6. يطبع على الشاشة:
+   `[COMPUTED] Completed visits for Patient Mohamed (patient-238):`
+
+#### المرة الثانية فوراً لنفس المريض (الكاش - CACHE HIT):
+المستخدم يختار `13` لنفس المريض ثانية:
+1. يفحص الكاش: `if "patient-238" in self._visit_lookup_cache:` -> **`True`**!
+2. يسحب النتيجة مباشرة من الذاكرة بـ $O(1)$ دون استدعاء الدالة العودية ودون فحص أي سجلات.
+3. يعين: `is_hit = True`.
+4. يطبع على الشاشة فوراً:
+   `[CACHE HIT] Completed visits for Patient Mohamed (patient-238):`
+
+---
+
+### سيناريو كامل 3: طابور الانتظار والإيتريتور المخصص ( الخيار 5 )
+
+المستخدم يدخل `5`.
+
+1. يستدعي: `queue_iter = manager.get_waiting_queue_iterator()`.
+2. يرتب المواعيد المنتظرة بـ `lambda appt: (appt.patient.priority_level(), appt.time)`.
+   (حالات الطوارئ ذات الأولوية 1 تسبق العادي ذات الأولوية 2 تلقائياً).
+3. يُنشأ كائن `WaitingQueueIterator(waiting)`.
+4. **حلقة `for appt in queue_iter:` (السطر 1283):**
+   * يستدعي `__next__()`:
+     * الدورة 1: يرجع الموعد الأول ويزيد `_index`.
+     * الدورة 2: يرجع الموعد الثاني ويزيد `_index`.
+     * الدورة 3: وصل لنهاية القائمة فيطلق `raise StopIteration`.
+   * حلقة `for` تلتقط `StopIteration` وتتوقف بسلام.
+5. يطبع جدول الطابور مع تمييز صفوف الطوارئ بـ `[!] EMERGENCY`.
+
+---
+
+### سيناريو كامل 4: حذف موعد وتنقيص عداد الكلوزر ( الخيار 7 )
+
+المستخدم يختار `7` لحذف كشف طوارئ:
+1. يفحص الصلاحية: مسموحة للأدمن فقط ومرفوضة لغيره.
+2. يستقبل رقم الموعد (Index) ويطلب التأكيد `yes/no`.
+3. يستدعي `manager.delete_appointment(idx)`:
+   * يسحب الموعد عبر `self.appointments.pop(idx)`.
+   * يحرر وقت الطبيب من `booked_date`.
+   * يحذف الموعد من سجل زيارات المريض.
+   * **تعديل عداد الكلوزر بـ `nonlocal` (السطر 606):**
+     ```python
+     if appt.patient.priority_level() == 1:
+         self.fee_calculator.decrement_emergency_count()
+     ```
+     يدخل دالة `decrement_emergency_count` وينقص المتغير `emergency_count` المخزن في الذاكرة بمقدار 1!
+   * يبطل كاش المريض.
+4. يحفظ التغييرات في الـ JSON ويطبع رسالة النجاح وقيمة عداد الطوارئ المتبقية.
+
+---
+
+### سيناريو كامل 5: تصدير التقرير اليومي ومبدأ DRY ( الخيار 12 )
+
+المستخدم يختار `12`:
+1. يفحص الصلاحية: مسموحة للأدمن وموظف الاستقبال، ومرفوضة للطبيب.
+2. يستقبل مسار الملف (افتراضياً `daily_report.txt`).
+3. يستدعي `manager.export_report_to_file("daily_report.txt")`:
+   * يستدعي `_compute_report_metrics()` التي تجمع كافة مؤشرات الأداء والأرباح المحسوبة بـ `reduce`.
+   * يستدعي `_format_report_table()` لصناعة الفريم الموحد مع الـ Timestamp.
+   * يفتح الملف ويكتب التقرير بداخله مع معالجة الأخطاء بـ `try/except`.
+4. يطبع: `[SUCCESS] Daily report exported successfully to 'daily_report.txt'.`
+
+---
+
+### سيناريو كامل 6: رفض الصلاحيات (Role-Based Access Control)
+
+لنفترض أن المستخدم الذي دخل كان **الطبيب** (`doctor` / `doc123`):
+* حاول الطبيب اختيار **[1] تسجيل مريض**:
+  1. السطر 998: `if not current_user.has_permission("register_patient"):`
+  2. يستدعي `has_permission` على كائن `DoctorUser`.
+  3. الطبيب لا يملك هذه الصلاحية -> ترجع `False`.
+  4. النفي يجعل الشرط `True`، فيطبع فوراً:
+     `[ERROR] Access denied. Your role 'Doctor' does not permit this action.`
+  5. ينفذ السطر 1000: `continue` ويعود للقائمة الرئيسية دون إحداث أي تغيير!
+
+---
+
+### الخطوة 10: إنهاء البرنامج والحفظ الآمن (Exit & Auto-Save)
+
+#### السيناريو الطبيعي (الخيار 11):
+المستخدم يختار `11`.
+* يستدعي `manager.save_to_file("clinic_data.json", silent=True)`.
+* يطبع رسالة الوداع: `Data saved successfully. Goodbye!`.
+* ينفذ `break` فتنكسر حلقة `while True` وتخرج دالة `main()`، ويغلق بايثون العملية بسلام.
+
+#### سيناريو الإغلاق الفجائي (Ctrl + C):
+إذا تم الضغط على `Ctrl + C` في أي وقت، يطلق بايثون `KeyboardInterrupt`.
+السطر 1473 يلتقطه فوراً:
+```python
+except (KeyboardInterrupt, SystemExit):
+    print("
+
+[INFO] Program interrupted. Auto-saving clinic database before exit...")
+    manager.save_to_file("clinic_data.json", silent=True)
+    print("[SUCCESS] All clinic records saved safely. Goodbye!
+")
+```
+يحفظ كل البيانات تلقائياً على القرص الصلب قبل الإغلاق، مما يحمي قاعدة البيانات من التلف.
+
+```text
+============================================================
+                         RUN END
+============================================================
+```
+
+---
+
+## المرحلة 5 — الجداول المرجعية الشاملة
+
+### 1. جدول الكلاسات (Classes)
+
+| Class | لماذا موجود؟ | Objects منه أثناء التشغيل | أهم البيانات (Attributes) | أهم Methods |
+|---|---|---|---|---|
+| `User` | كلاس أب لنظام الصلاحيات | لا ينشأ أوبجكت مباشر منه (Abstract) | `username`, `password`, `allowed_actions` | `has_permission`, `display_role` |
+| `AdminUser` | مدير النظام بصلاحيات كاملة | كائن واحد عند دخول الأدمن (`current_user`) | يرث بيانات `User` | `has_permission` ترجع `True` دائماً |
+| `ReceptionistUser` | موظف الاستقبال | كائن واحد عند دخول موظف الاستقبال | يرث بيانات `User` مع قائمة محددة | `has_permission` |
+| `DoctorUser` | الطبيب | كائن واحد عند دخول الدكتور | يرث بيانات `User` مع صلاحيات معاينة | `has_permission` |
+| `Person` | كلاس أب للأفراد مع فحص الهاتف | لا ينشأ مباشرة بل عبر أبنائه | `person_id`, `name`, `phone` | `display_profile`, `__str__` |
+| `Patient` | تمثيل المريض العام | ينشأ عبر أبنائه المتخصصين | يرث `Person` + `age`, `case_type`, `visit_history` | `priority_level` (ترجع 2), `add_visit` |
+| `EmergencyPatient`| مريض طوارئ | كائن لكل مريض طوارئ مسجل | نفس بيانات المريض | `priority_level` (ترجع 1) |
+| `RegularPatient` | مريض عادي | كائن لكل مريض عادي مسجل | نفس بيانات المريض | `priority_level` (ترجع 2) |
+| `Doctor` | تمثيل الطبيب | كائن لكل طبيب مسجل في العيادة | يرث `Person` + `specialty`, `availability` | `toggle_availability`, `display_profile` |
+| `Appointment` | كشف طبي يربط المريض بالطبيب | كائن لكل كشف محجوز | `patient`, `doctor`, `time`, `status`, `fee` | `update_status`, `__str__` |
+| `WaitingQueueIterator`| إيتريتور للمرور على الطابور | ينشأ عند عرض الطابور (الخيار 5) | `_appointments`, `_index` | `__iter__`, `__next__` |
+| `ClinicManager` | المايسترو المشرف على النظام | كائن واحد `manager` طوال فترة تشغيل البرنامج | `patients`, `doctors`, `appointments`, `booked_date`, `_visit_lookup_cache` | `book_appointment`, `daily_report`, `export_report_to_file`, إلخ |
+
+---
+
+### 2. جدول الدوال الأساسية (Functions)
+
+| Function | من يستدعيها؟ | تستقبل ماذا؟ | البيانات من أين؟ | ماذا تفعل؟ | ماذا ترجع؟ | ترجع لمن؟ |
 |---|---|---|---|---|---|---|
-| `ClinicError` | Exception Class | أسطر 14-16 | الكلاس الأساسي لجميع استثناءات العيادة | رسالة الخطأ | المبرمج عند الرفع | كائن استثناء |
-| `User` | Base Class | أسطر 48-63 | تمثيل المستخدم وإدارة الصلاحيات | `username, password, allowed_actions` | كلاسات الأبناء | كائن مستخدم أساسي |
-| `AdminUser` | Subclass | أسطر 65-76 | تمثيل مدير النظام بصلاحيات مطلقة | `username, password` | دالة التحقق | كائن أدمن |
-| `ReceptionistUser` | Subclass | أسطر 79-98 | تمثيل موظف الاستقبال بصلاحيات تشغيلية | `username, password` | دالة التحقق | كائن موظف استقبال |
-| `DoctorUser` | Subclass | أسطر 100-114 | تمثيل الطبيب بصلاحيات معاينة وتحديث | `username, password` | دالة التحقق | كائن طبيب مستخدم |
-| `USERS_DB` | Global Dict | أسطر 117-130 | قاعدة بيانات الحسابات المدمجة | بيانات الحسابات والمصانع | ثابتة في الكود | قاموس الحسابات |
-| `authenticate` | Function | أسطر 133-139 | فحص بيانات الدخول واستخراج كائن المستخدم | `username, password` | شاشة الدخول | كائن `User` مشتق |
-| `login_screen` | Function | أسطر 142-165 | واجهة تسجيل الدخول التفاعلية مع التكرار | مدخلات الكونسول | المستخدم | كائن المستخدم المسجل |
-| `validate_phone` | Function | أسطر 187-189 | فحص صحة الموبايل المصري عبر Regex | `phone: str` | واجهة المستخدم | `bool` (True / False) |
-| `Person` | Base Class | أسطر 256-271 | تمثيل الكائن البشري (اسم، هاتف، كود) | `person_id, name, phone` | كلاسات المرضى والأطباء | كائن شخص أساسي |
-| `Patient` | Subclass | أسطر 273-291 | تمثيل المريض مع سجل الزيارات والأولوية | `id, name, phone, age, case` | كلاسات المرضى الفرعية | كائن مريض |
-| `EmergencyPatient` | Subclass | أسطر 294-302 | مريض طوارئ بأولوية قصوى (1) | نفس مدخلات المريض | واجهة التسجيل | كائن مريض طوارئ |
-| `RegularPatient` | Subclass | أسطر 304-312 | مريض عادي بأولوية عادية (2) | نفس مدخلات المريض | واجهة التسجيل | كائن مريض عادي |
-| `Doctor` | Subclass | أسطر 314-330 | تمثيل الطبيب والتخصص وتوفر العمل | `id, name, phone, spec, avail` | واجهة إضافة الأطباء | كائن طبيب |
-| `Appointment` | Class | أسطر 332-350 | ربط المريض بالطبيب والوقت والحالة والرسوم | `patient, doc, time, status, fee` | دالة الحجز | كائن كشف طبي |
-| `WaitingQueueIterator`| Iterator Class| أسطر 356-371 | المرور التكراري المخصص على الطابور | قائمة المواعيد مرتبة | `ClinicManager` | كشف تلو الآخر عبر `next` |
-| `make_triage_calculator`| Closure Func | أسطر 374-401 | حساب الرسوم وحفظ وتعديل عداد الطوارئ | `base_fee, initial_emergency` | `ClinicManager` | دالة `calculate` بالعداد |
-| `find_visits_recursive`| Recursive Func| أسطر 404-416 | استخراج الكشوفات المكتملة عودياً بدون loops | `visits: list, index: int` | ميثود تاريخ المريض | قائمة الكشوفات المكتملة |
-| `ClinicManager` | Manager Class | أسطر 423-948 | إدارة النظام وقواعد البيانات والكاش والتقارير | `base_fee: float` | دالة `main()` | كائن المدير التنفيذي |
-| `_visit_lookup_cache`| Instance Dict| سطر 435 | التخزين المؤقت لنتائج البحث (Memoization) | نتائج استعلامات الزيارات | الدالة العودية | كاش الزيارات $O(1)$ |
-| `main` | Main Function | أسطر 960-1472| تشغيل دورة حياة التطبيق والقائمة التفاعلية | لا يوجد | مفسر بايثون عند التشغيل | إنهاء البرنامج بنجاح |
+| `authenticate` | `login_screen` | `username, password` | مدخلات المستخدم بالكونسول | تفحص الحساب في `USERS_DB` | كائن مشتق من `User` | دالة `login_screen` |
+| `login_screen` | `main` | لا شيء | مدخلات الكونسول | تدير حلقة الدخول مع الـ Exception | كائن المستخدم المصادق عليه | دالة `main` |
+| `validate_phone` | `Person.__init__` | `phone: str` | مدخلات تسجيل المريض/الطبيب | تفحص تطابق نمط الهاتف المصري | `True / False` | كلاس `Person` |
+| `parse_menu_choice` | `main` | `val: str` | إدخال المستخدم في القائمة | تحول أي كلمة أو رقم للرقم المعياري | نص رقم الخيار (`"1"` إلى `"13"`) | دالة `main` |
+| `make_triage_calculator`| `ClinicManager.__init__` | `base_fee, initial_emergency` | مدير العيادة عند التهيئة | تبني كلوزر بمتغير `nonlocal` | دالة `calculate` بالعداد | سمة `manager.fee_calculator` |
+| `find_visits_recursive` | `get_patient_completed_visits` | `visits: list, index: int` | سجل زيارات المريض | تستخرج الزيارات المكتملة عودياً | قائمة المواعيد المكتملة | ميثود تاريخ المريض بالكاش |
 
 ---
 
-## 6. قصة عمل البرنامج المتكاملة
+### 3. جدول أهم المتغيرات (Variables Tracing)
+
+| Variable | نوعه | قيمته لحظة إنشائه | أخذها منين؟ | تستخدم فين؟ | هل تتغير قيمته؟ |
+|---|---|---|---|---|---|
+| `manager` | `ClinicManager` | كائن جديد فارغ | `ClinicManager(100.0)` | في كل عمليات دالة `main` | كائن ثابت ولكن تتغير محتويات قواميسه |
+| `current_user` | مشتق من `User` | كائن المستخدم المسجل | دالة `login_screen()` | لفحص الصلاحيات وعرض الدور بالمنيو | ثابت طوال الجلسة |
+| `emergency_count`| `int` داخل الكلوزر| 0 (أو عدد المحفوظ) | معامل الدالة الحاضنة | لتسعير الطوارئ والتقارير | تتغير بـ `+= 1` عند الحجز و `-= 1` عند الحذف |
+| `_visit_lookup_cache`| `dict` | قاموس فارغ `{}` | تهيئة `ClinicManager` | لتخزين واسترجاع سجل المرضى $O(1)$ | تضاف له مفاتيح، ويتم إفراغها عند أي تعديل للمريض |
+| `choice` | `str` | رقم الخيار المختار | دالة `parse_menu_choice` | داخل شروط `if / elif` لتوجيه التنفيذ | يتغير في كل دورة للقائمة |
+
+---
+
+### 4. جدول الاستثناءات (Exceptions)
+
+| Exception | حصلت فين؟ | لماذا حدثت؟ | مين مسكها؟ (`except`) | البرنامج عمل إيه بعدها؟ |
+|---|---|---|---|---|
+| `ClinicError` | في `authenticate` | كلمة المرور أو اسم المستخدم غير مطابق | `login_screen` | طبعت رسالة خطأ وكررت المحاولة للمستخدم |
+| `ClinicError` | داخل ميثودز `ClinicManager` | المستخدم حاول تنفيذ أمر غير مصرح لدوره | الكونسول في القائمة الرئيسية | طبعت رفض الصلاحية وأكمل البرنامج دورته |
+| `InvalidFormatError` | في `Person.__init__` | رقم الهاتف ليس 11 رقماً أو لا يبدأ بـ 01 | واجهة التسجيل بالمنيو | منعت تسجيل المريض وطالبت بإدخال سليم |
+| `DuplicateBookingError`| في `book_appointment` | الطبيب محجوز في نفس التوقيت لمريض آخر | شاشة الحجز بالمنيو | نبهت المستخدم بتعارض الموعد لإدخال وقت آخر |
+| `StopIteration` | داخل `WaitingQueueIterator` | وصل المؤشر لنهاية طابور الانتظار | حلقة `for` تلقائياً | أنهت طباعة جدول الطابور بسلام |
+| `KeyboardInterrupt` | في أي مكان بالبرنامج | المستخدم ضغط `Ctrl + C` لمقاطعة البرنامج | بلوك الأمان في نهاية `main` | حفظت كافة البيانات تلقائياً وخرجت بأمان تام |
+
+---
+
+## المرحلة 6 — قصة عمل البرنامج المتكاملة
 
 1. **الاستيقاظ والتهيئة في الذاكرة:**
    يبدأ البرنامج بتجهيز نفسه في الذاكرة فور الضغط على زر التشغيل؛ يستدعي مكتبات التعامل مع البيانات والوقت والملفات، يجمع أنماط الـ Regex لتسريع فحص البيانات لاحقاً، ويبني قوالب الكلاسات للهيكل البرمجي ونظام الصلاحيات.
