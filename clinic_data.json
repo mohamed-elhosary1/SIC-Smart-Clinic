@@ -15,6 +15,14 @@
             "phone": "01017513072",
             "age": 19,
             "case_type": "Im dying"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-318",
+            "name": "Mohamed Elhosary",
+            "phone": "01017513072",
+            "age": 19,
+            "case_type": "بموت"
         }
     ],
     "doctors": [],
