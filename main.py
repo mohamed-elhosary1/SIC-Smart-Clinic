@@ -150,29 +150,61 @@ def authenticate(username: str, password: str, manager) -> User:
 
 
 def login_screen(manager) -> User:
-    """شاشة تسجيل الدخول التفاعلية مع معالجة الأخطاء والتكرار"""
-    print("\n+" + "=" * 54 + "+")
-    print("|" + "CLINIC LOGIN SYSTEM".center(54) + "|")
-    print("|" + "Samsung Innovation Campus".center(54) + "|")
-    print("+" + "=" * 54 + "+")
-    print("| Default accounts:                                    |")
-    print("|   * Staff:        staff        / staff123            |")
-    print("|   * Doctor:       doctor       / doc123              |")
-    print("|   * Patient:      <patient_id> / <your_password>     |")
-    print("+" + "-" * 54 + "+")
-
+    """شاشة البداية وتسجيل الدخول مع إتاحة التسجيل الذاتي للمرضى فقط"""
     while True:
-        try:
-            username = input("\n  Username (or Patient ID): ").strip()
-            if not username:
-                print("\n[ERROR] Username cannot be empty. Please try again.")
-                continue
-            password = input("  Password: ").strip()
-            user = authenticate(username, password, manager)
-            print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
-            return user
-        except ClinicError as err:
-            print(f"\n[ERROR] {err} Try again.")
+        print("\n+" + "=" * 54 + "+")
+        print("|" + "SMART CLINIC SYSTEM".center(54) + "|")
+        print("|" + "Samsung Innovation Campus".center(54) + "|")
+        print("+" + "=" * 54 + "+")
+        print("|  [1] Login (Staff / Doctor / Patient)                |")
+        print("|  [2] Register New Patient                            |")
+        print("|  [3] Exit                                            |")
+        print("+" + "-" * 54 + "+")
+
+        raw_choice = input("\nEnter choice (1-3) [or enter username directly]: ").strip()
+        choice = raw_choice.lower()
+
+        if choice in ("1", "login", "log in", "دخول", "تسجيل دخول"):
+            while True:
+                try:
+                    username = input("\n  Username (or Patient ID) [or 'cancel']: ").strip()
+                    if username.lower() == "cancel":
+                        break
+                    if not username:
+                        print("\n[ERROR] Username cannot be empty. Please try again.")
+                        continue
+                    password = input("  Password: ").strip()
+                    user = authenticate(username, password, manager)
+                    print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
+                    return user
+                except ClinicError as err:
+                    print(f"\n[ERROR] {err} Try again.")
+
+        elif choice in ("2", "register", "reg", "patient", "تسجيل", "تسجيل مريض", "مريض جديد"):
+            registered_patient = action_register_patient(manager)
+            if registered_patient:
+                login_now = input("  Would you like to log in to Patient Portal now? (yes/no) [Default: yes]: ").strip().lower()
+                if login_now in ("", "y", "yes", "نعم", "موافق"):
+                    user = PatientUser(username=registered_patient.name, password=registered_patient.password, patient_id=registered_patient.person_id)
+                    print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
+                    return user
+
+        elif choice in ("3", "exit", "quit", "q", "خروج"):
+            print("\nExiting Smart Clinic Queue System. Goodbye!\n")
+            raise SystemExit
+
+        elif choice in USERS_DB or any(p_id.lower() == choice for p_id in manager.patients):
+            try:
+                password = input(f"  Password for '{raw_choice}': ").strip()
+                user = authenticate(raw_choice, password, manager)
+                print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
+                return user
+            except ClinicError as err:
+                print(f"\n[ERROR] {err} Try again.")
+
+        else:
+            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please select 1 (Login), 2 (Register New Patient), or 3 (Exit).\n")
+
 
 
 # =========================================================
@@ -977,7 +1009,7 @@ def action_register_patient(manager: ClinicManager):
     print_section_header("REGISTER PATIENT")
     if manager.current_user is not None and not manager.current_user.has_permission("register_patient"):
         print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
-        return
+        return None
 
     # نوع المريض (يقبل 1، 2، Regular، Emergency، عادي، طوارئ)
     while True:
@@ -993,7 +1025,7 @@ def action_register_patient(manager: ClinicManager):
     while True:
         name = input("  Full Name      [or 'cancel' to exit]: ").strip()
         if name.lower() == "cancel":
-            return
+            return None
         if name:
             break
         print("\n[ERROR] Patient name cannot be empty. Please try again.\n")
@@ -1002,7 +1034,7 @@ def action_register_patient(manager: ClinicManager):
     while True:
         phone = input("  Phone Number   (11 digits, e.g. 01012345678) [or 'cancel']: ").strip()
         if phone.lower() == "cancel":
-            return
+            return None
         if not validate_phone(phone):
             print(f"\n[ERROR] Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.\n")
             continue
@@ -1012,7 +1044,7 @@ def action_register_patient(manager: ClinicManager):
     while True:
         age_input = input("  Patient Age    [or 'cancel']: ").strip()
         if age_input.lower() == "cancel":
-            return
+            return None
         try:
             age = int(age_input)
             if age <= 0 or age > 130:
@@ -1025,14 +1057,14 @@ def action_register_patient(manager: ClinicManager):
     while True:
         password = input("  Account Pass   (Patient Portal password) [or 'cancel']: ").strip()
         if password.lower() == "cancel":
-            return
+            return None
         if password:
             break
         print("\n[ERROR] Password cannot be empty. Please try again.\n")
 
     case_type = input("  Diagnosis/Case [or 'cancel']: ").strip()
     if case_type.lower() == "cancel":
-        return
+        return None
 
     try:
         if p_type == "2":
@@ -1059,8 +1091,10 @@ def action_register_patient(manager: ClinicManager):
         print(f"|  Account Pass  : {password:<35} |")
         print(f"|  Diagnosis     : {(new_p.case_type or 'General Checkup'):<35} |")
         print("+" + "-" * 54 + "+\n")
+        return new_p
     except ClinicError as err:
         print(f"\n[ERROR] Registration failed: {err}\n")
+        return None
 
 
 def action_add_doctor(manager: ClinicManager):
