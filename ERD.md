@@ -14,6 +14,7 @@ erDiagram
         string person_id PK, FK "References PERSON.person_id"
         int age "Valid range: 1 - 130"
         string case_type "Diagnosis / Medical Case"
+        string password "Portal authentication password"
         string patient_type "Discriminator: 'Regular' | 'Emergency'"
         int priority_level "1 for Emergency | 2 for Regular"
     }
@@ -77,6 +78,7 @@ classDiagram
     class Patient {
         +int age
         +str case_type
+        +str password
         +list visit_history
         +display_profile() str
         +priority_level() int
@@ -141,10 +143,36 @@ classDiagram
         +reset_database(path) bool
     }
 
+    class User {
+        +str username
+        +str password
+        +set allowed_actions
+        +has_permission(action) bool
+        +display_role() str
+    }
+
+    class StaffUser {
+        +has_permission(action) bool : returns True
+        +display_role() str : returns "Staff"
+    }
+
+    class DoctorUser {
+        +display_role() str : returns "Doctor"
+    }
+
+    class PatientUser {
+        +str patient_id
+        +display_role() str : returns "Patient"
+    }
+
     Person <|-- Patient : Inheritance
     Person <|-- Doctor : Inheritance
     Patient <|-- RegularPatient : Polymorphic Specialization
     Patient <|-- EmergencyPatient : Polymorphic Specialization
+
+    User <|-- StaffUser : Full Access
+    User <|-- DoctorUser : Clinical Access
+    User <|-- PatientUser : Scoped Access
 
     Patient "1" o-- "0..*" Appointment : visit_history
     Doctor "1" o-- "0..*" Appointment : assigned_appointments

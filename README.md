@@ -17,31 +17,43 @@
 
 ## شاشة تسجيل الدخول والصلاحيات (Authentication & RBAC)
 
-عند تشغيل النظام، تظهر شاشة تسجيل دخول إلزامية. تتوفر ثلاثة حسابات تجريبية مدمجة:
+عند تشغيل النظام، تظهر شاشة تسجيل دخول إلزامية. يدعم النظام ثلاثة أدوار رئيسية:
 
-| الدور الوظيفي (Role) | اسم المستخدم (Username) | كلمة المرور (Password) | الصلاحيات الأساسية |
+| الدور الوظيفي (Role) | اسم المستخدم (Username) | كلمة المرور (Password) | الصلاحيات ونطاق الوصول |
 |---|---|---|---|
-| **Administrator** | `admin` | `admin123` | كافة الصلاحيات كاملة بدون أي قيود (إدارة، حذف، تصفير، تقارير). |
-| **Receptionist** | `receptionist` | `recep123` | تسجيل المرضى، إضافة دكاترة، حجز المواعيد، تحديث الحالات، تبديل توفر الطبيب، عرض الطابور، تاريخ المريض، وتصدير التقرير. |
-| **Doctor** | `doctor` | `doc123` | معاينة طابور الانتظار، تحديث حالة الكشف، والاطلاع على تاريخ المريض المكتمل. |
+| **Staff** | `staff` | `staff123` | إدارة كاملة لكافة العمليات دون قيود (تسجيل مرضى وأطباء، حجز، حذف، تصفير، تقارير). |
+| **Doctor** | `doctor` | `doc123` | معاينة طابور الانتظار، تحديث حالة الكشف، التقرير اليومي، والاطلاع على تاريخ المريض المكتمل. |
+| **Patient** | `<patient_id>` | `<password>` | بوابة المريض (Patient Portal) مقيدة بنطاق بيانات المريض الحالي فقط (مواعيده، دوره في الطابور، سجله). |
 
-### مصفوفة الصلاحيات (Role Permissions Matrix)
+### واجهات القوائم المخصصة حسب الدور (Role-Specific Menus)
 
-| العملية (Action) | Administrator | Receptionist | Doctor |
-|---|:---:|:---:|:---:|
-| `[1] Register Patient` | نعم | نعم | لا |
-| `[2] Add Doctor` | نعم | نعم | لا |
-| `[3] Book Appointment` | نعم | نعم | لا |
-| `[4] Update Visit Status` | نعم | نعم | نعم |
-| `[5] Show Waiting Queue` | نعم | نعم | نعم |
-| `[6] Toggle Doctor Status` | نعم | نعم | لا |
-| `[7] Delete Appointment` | نعم | لا | لا |
-| `[8] Daily Report` | نعم | نعم | نعم |
-| `[9] Save Data Now` | نعم | نعم | نعم |
-| `[10] Reset Clinic Data` | نعم | لا | لا |
-| `[11] Quit (Auto-Save)` | نعم | نعم | نعم |
-| `[12] Export Report` | نعم | نعم | لا |
-| `[13] Patient History (Memo)` | نعم | نعم | نعم |
+1. **قائمة موظف العيادة (Staff Menu — 13 خياراً):**
+   - `[1] Register Patient`
+   - `[2] Add Doctor`
+   - `[3] Book Appointment`
+   - `[4] Update Visit Status`
+   - `[5] Show Waiting Queue`
+   - `[6] Toggle Doctor Status`
+   - `[7] Delete Appointment`
+   - `[8] Daily Report`
+   - `[9] Save Data Now`
+   - `[10] Reset Clinic Data`
+   - `[11] Export Report`
+   - `[12] Patient History`
+   - `[13] Quit (Auto-Save)`
+
+2. **بوابة الطبيب (Doctor Portal — 5 خيارات):**
+   - `[1] Show Waiting Queue`
+   - `[2] Update Visit Status`
+   - `[3] Daily Report`
+   - `[4] Patient History`
+   - `[5] Quit (Auto-Save)`
+
+3. **بوابة المريض (Patient Portal — 4 خيارات مقيدة ببيانات المريض الحالي دون إدخال ID):**
+   - `[1] My Appointments`
+   - `[2] My Queue Position`
+   - `[3] My Visit History`
+   - `[4] Logout / Quit`
 
 ---
 
@@ -68,9 +80,9 @@
 | `Appointment` | Class | يمثل كشف طبي يربط المريض بالطبيب والوقت والحالة والرسوم |
 | `WaitingQueueIterator` | Iterator Class | كاستم إيتريتور للمرور على طابور الانتظار خطوة بخطوة |
 | `User` | Auth Base Class | الكلاس الأساسي للمستخدمين مع إدارة الصلاحيات ومجموعات العمليات |
-| `AdminUser(User)` | Auth Subclass | مدير النظام — صلاحيات كاملة دائماً |
-| `ReceptionistUser(User)` | Auth Subclass | موظف استقبال — صلاحيات العمليات اليومية والحجز |
-| `DoctorUser(User)` | Auth Subclass | طبيب — صلاحيات المعاينة وتحديث الكشوفات |
+| `StaffUser(User)` | Auth Subclass | موظف العيادة — صلاحيات كاملة لإدارة النظام، الأطباء، المرضى، والحجوزات |
+| `DoctorUser(User)` | Auth Subclass | طبيب — صلاحيات المعاينة، تحديث الكشوفات، التقرير اليومي، والتاريخ الطبي |
+| `PatientUser(User)` | Auth Subclass | مريض — وصول مقيد ومحصور ببيانات المريض الحالي فقط |
 | `ClinicManager` | Manager Class | المايسترو المشرف على النظام وقواعد البيانات والكاش والتقارير |
 
 ---
@@ -88,5 +100,5 @@
 | **Regex** | `validate_patient_id()`, `validate_doctor_id()`, `validate_phone()` | التحقق الصارم من صيغ المعرفات وأرقام الهواتف المصرية المكونة من 11 رقماً |
 | **Custom Exceptions** | `ClinicError`, `DuplicateBookingError`, `InvalidAppointmentTimeError`, ... | معالجة دقيقة ومنظمة لكافة حالات الخطأ المحتملة في النظام |
 | **Custom Iterator** | `WaitingQueueIterator` (`__iter__` / `__next__`) | تكرار مخصص على عناصر الطابور بشكل متسلسل ومباشر |
-| **Inheritance & Polymorphism** | `Person → Patient/Doctor`, `Patient → Emergency/Regular`, `User → Admin/Recep/Doc` | تطبيق تعددي حقيقي في `display_profile()`, `priority_level()`, و `has_permission()` |
+| **Inheritance & Polymorphism** | `Person → Patient/Doctor`, `Patient → Emergency/Regular`, `User → Staff/Doctor/Patient` | تطبيق تعددي حقيقي في `display_profile()`, `priority_level()`, و `has_permission()` |
 | **File I/O & JSON Recovery** | `save_to_file()`, `load_from_file()` | حفظ البيانات بصيغة JSON مع معالجة الاسترداد والنسخ الاحتياطي التلقائي `.bak` |

@@ -48,7 +48,7 @@ class InvalidFormatError(ClinicError):
 # =========================================================
 
 class User:
-    """كلاس أب لأي مستخدم في النظام (Admin/Receptionist/Doctor)"""
+    """كلاس أب لأي مستخدم في النظام (Staff/Doctor/Patient)"""
 
     def __init__(self, username: str, password: str, allowed_actions: set):
         self.username = username
@@ -64,47 +64,27 @@ class User:
         return "Generic User"
 
 
-class AdminUser(User):
-    """مدير النظام - يمتلك كافة الصلاحيات دون قيود"""
+class StaffUser(User):
+    """موظف العيادة - يمتلك كافة الصلاحيات الإدارية والتشغيلية في النظام دون قيود"""
 
     def __init__(self, username: str, password: str):
         super().__init__(username, password, allowed_actions=set())
 
     def has_permission(self, action: str) -> bool:
-        # الأدمن مسموح له بكل العمليات دائمًا
+        # موظف العيادة مسموح له بكافة العمليات دائمًا
         return True
 
     def display_role(self) -> str:
-        return "Administrator"
-
-
-class ReceptionistUser(User):
-    """موظف الاستقبال - يدير التسجيل والحجز وتحديث الحالات والجدول وسجل المريض وتصدير التقرير"""
-
-    RECEPTIONIST_ACTIONS = {
-        "register_patient",
-        "add_doctor",
-        "book_appointment",
-        "update_visit_status",
-        "view_queue",
-        "toggle_doctor_availability",
-        "view_history",
-        "export_report",
-    }
-
-    def __init__(self, username: str, password: str):
-        super().__init__(username, password, allowed_actions=self.RECEPTIONIST_ACTIONS)
-
-    def display_role(self) -> str:
-        return "Receptionist"
+        return "Staff"
 
 
 class DoctorUser(User):
-    """الطبيب - يعاين طابور الانتظار ويحدث حالة الكشف ويطلع على تاريخ المريض"""
+    """الطبيب - يعاين طابور الانتظار ويحدث حالة الكشف ويطلع على تاريخ المريض والتقرير اليومي"""
 
     DOCTOR_ACTIONS = {
         "view_queue",
         "update_visit_status",
+        "daily_report",
         "view_history",
     }
 
@@ -115,15 +95,26 @@ class DoctorUser(User):
         return "Doctor"
 
 
-# قاعدة بيانات المستخدمين التجريبية الافتراضية
+class PatientUser(User):
+    """المريض - يطّلع فقط على بياناته الخاصة (مواعيده، دوره في الطابور، وسجله الطبي)"""
+
+    PATIENT_ACTIONS = {
+        "view_own_data",
+    }
+
+    def __init__(self, username: str, password: str, patient_id: str):
+        super().__init__(username, password, allowed_actions=self.PATIENT_ACTIONS)
+        self.patient_id = patient_id
+
+    def display_role(self) -> str:
+        return "Patient"
+
+
+# قاعدة بيانات المستخدمين التجريبية الافتراضية للطاقم الطبي والإداري
 USERS_DB: dict[str, dict] = {
-    "admin": {
-        "password": "admin123",
-        "factory": lambda u, p: AdminUser(u, p),
-    },
-    "receptionist": {
-        "password": "recep123",
-        "factory": lambda u, p: ReceptionistUser(u, p),
+    "staff": {
+        "password": "staff123",
+        "factory": lambda u, p: StaffUser(u, p),
     },
     "doctor": {
         "password": "doc123",
@@ -132,35 +123,52 @@ USERS_DB: dict[str, dict] = {
 }
 
 
-def authenticate(username: str, password: str) -> User:
-    """التحقق من بيانات الدخول وإرجاع كائن المستخدم المناسب"""
-    u_key = username.strip().lower()
-    user_record = USERS_DB.get(u_key)
-    if not user_record or user_record["password"] != password.strip():
+def authenticate(username: str, password: str, manager) -> User:
+    """التحقق من بيانات الدخول (Staff / Doctor / Patient) وإرجاع كائن المستخدم المناسب"""
+    u_clean = username.strip()
+    u_key = u_clean.lower()
+    p_clean = password.strip()
+
+    # 1. فحص حسابات الطاقم الطبي والإداري (Staff / Doctor)
+    if u_key in USERS_DB:
+        user_record = USERS_DB[u_key]
+        if user_record["password"] == p_clean:
+            return user_record["factory"](u_clean, p_clean)
         raise ClinicError("Invalid credentials. Please check username and password.")
-    return user_record["factory"](username.strip(), password.strip())
+
+    # 2. فحص حسابات المرضى المسجلين (ID المريض وكلمة المرور الخاصة به)
+    for p_id, patient in manager.patients.items():
+        if p_id.lower() == u_key:
+            if patient.password and patient.password == p_clean:
+                return PatientUser(username=patient.name, password=p_clean, patient_id=patient.person_id)
+            elif not patient.password:
+                raise ClinicError("This patient account does not have a password set. Please contact clinic staff.")
+            else:
+                raise ClinicError("Invalid credentials. Please check username and password.")
+
+    raise ClinicError("Invalid credentials. Please check username and password.")
 
 
-def login_screen() -> User:
+def login_screen(manager) -> User:
     """شاشة تسجيل الدخول التفاعلية مع معالجة الأخطاء والتكرار"""
     print("\n+" + "=" * 54 + "+")
     print("|" + "CLINIC LOGIN SYSTEM".center(54) + "|")
     print("|" + "Samsung Innovation Campus".center(54) + "|")
     print("+" + "=" * 54 + "+")
     print("| Default accounts:                                    |")
-    print("|   * Admin:        admin        / admin123            |")
-    print("|   * Receptionist: receptionist / recep123            |")
+    print("|   * Staff:        staff        / staff123            |")
     print("|   * Doctor:       doctor       / doc123              |")
+    print("|   * Patient:      <patient_id> / <your_password>     |")
     print("+" + "-" * 54 + "+")
 
     while True:
         try:
-            username = input("\n  Username: ").strip()
+            username = input("\n  Username (or Patient ID): ").strip()
             if not username:
                 print("\n[ERROR] Username cannot be empty. Please try again.")
                 continue
             password = input("  Password: ").strip()
-            user = authenticate(username, password)
+            user = authenticate(username, password, manager)
             print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
             return user
         except ClinicError as err:
@@ -242,11 +250,11 @@ def parse_menu_choice(val: str) -> str:
         return "9"
     if v in ("10", "reset", "reset data", "clear", "مسح", "تصفير", "اعادة ضبط"):
         return "10"
-    if v in ("11", "quit", "exit", "q", "خروج"):
+    if v in ("11", "export", "export report", "export daily report", "تصدير", "تصدير التقرير"):
         return "11"
-    if v in ("12", "export", "export report", "export daily report", "تصدير", "تصدير التقرير"):
+    if v in ("12", "history", "patient history", "completed visits", "سجل", "سجل المريض", "تاريخ المريض"):
         return "12"
-    if v in ("13", "history", "patient history", "completed visits", "سجل", "سجل المريض", "تاريخ المريض"):
+    if v in ("13", "quit", "exit", "q", "خروج"):
         return "13"
     return v
 
@@ -273,12 +281,13 @@ class Person:
 
 
 class Patient(Person):
-    def __init__(self, person_id: str, name: str, phone: str, age: int, case_type: str):
+    def __init__(self, person_id: str, name: str, phone: str, age: int, case_type: str, password: str = ""):
         if not validate_patient_id(person_id):
             raise InvalidFormatError(f"Invalid patient ID format: '{person_id}'. Expected 'patient-<number>'")
         super().__init__(person_id, name, phone)
         self.age = int(age)
         self.case_type = case_type.strip()
+        self.password = password.strip()
         self.visit_history: list = []
 
     def display_profile(self) -> str:
@@ -733,7 +742,7 @@ class ClinicManager:
 
     def get_patient_completed_visits(self, patient_id: str, return_status: bool = False):
         """استرجاع الزيارات المكتملة للمريض عبر دالة العودية مع التخزين المؤقت (Memoization)"""
-        if self.current_user is not None and not self.current_user.has_permission("view_history"):
+        if self.current_user is not None and not self.current_user.has_permission("view_history") and not self.current_user.has_permission("view_own_data"):
             raise ClinicError("Access denied. Your role does not permit this action.")
 
         if patient_id not in self.patients:
@@ -771,7 +780,8 @@ class ClinicManager:
                         "name": p.name,
                         "phone": p.phone,
                         "age": p.age,
-                        "case_type": p.case_type
+                        "case_type": p.case_type,
+                        "password": getattr(p, "password", "")
                     }
                     for p in self.patients.values()
                 ],
@@ -853,13 +863,15 @@ class ClinicManager:
         for p_data in data.get("patients", []):
             try:
                 p_type = p_data.get("type", "Regular")
+                p_pass = p_data.get("password", "")
                 if p_type == "Emergency":
                     patient = EmergencyPatient(
                         person_id=p_data["person_id"],
                         name=p_data["name"],
                         phone=p_data["phone"],
                         age=p_data["age"],
-                        case_type=p_data["case_type"]
+                        case_type=p_data["case_type"],
+                        password=p_pass
                     )
                 else:
                     patient = RegularPatient(
@@ -867,7 +879,8 @@ class ClinicManager:
                         name=p_data["name"],
                         phone=p_data["phone"],
                         age=p_data["age"],
-                        case_type=p_data["case_type"]
+                        case_type=p_data["case_type"],
+                        password=p_pass
                     )
                 self.patients[patient.person_id] = patient
             except Exception as e:
@@ -949,7 +962,7 @@ class ClinicManager:
 
 
 # =========================================================
-# INTERACTIVE CLI
+# UI HELPERS & STANDALONE ACTION FUNCTIONS
 # =========================================================
 
 def print_section_header(title: str, width: int = 54):
@@ -959,519 +972,725 @@ def print_section_header(title: str, width: int = 54):
     print("+" + "-" * width + "+")
 
 
+def action_register_patient(manager: ClinicManager):
+    """تسجيل مريض جديد (عادي أو طوارئ) وتحديد كلمة المرور لحسابه وحفظه فورياً"""
+    print_section_header("REGISTER PATIENT")
+    if manager.current_user is not None and not manager.current_user.has_permission("register_patient"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    # نوع المريض (يقبل 1، 2، Regular، Emergency، عادي، طوارئ)
+    while True:
+        raw_type = input("  Patient Type   (1: Regular, 2: Emergency) [Default: 1]: ").strip()
+        p_type = parse_patient_type(raw_type)
+        if p_type:
+            break
+        print("\n[ERROR] Please enter '1' / 'Regular' or '2' / 'Emergency'. Try again.\n")
+
+    p_id = manager.generate_unique_patient_id()
+
+    # الاسم
+    while True:
+        name = input("  Full Name      [or 'cancel' to exit]: ").strip()
+        if name.lower() == "cancel":
+            return
+        if name:
+            break
+        print("\n[ERROR] Patient name cannot be empty. Please try again.\n")
+
+    # رقم التليفون
+    while True:
+        phone = input("  Phone Number   (11 digits, e.g. 01012345678) [or 'cancel']: ").strip()
+        if phone.lower() == "cancel":
+            return
+        if not validate_phone(phone):
+            print(f"\n[ERROR] Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.\n")
+            continue
+        break
+
+    # العمر
+    while True:
+        age_input = input("  Patient Age    [or 'cancel']: ").strip()
+        if age_input.lower() == "cancel":
+            return
+        try:
+            age = int(age_input)
+            if age <= 0 or age > 130:
+                raise ValueError
+            break
+        except ValueError:
+            print(f"\n[ERROR] Age must be a valid positive integer between 1 and 130. Got '{age_input}'. Please try again.\n")
+
+    # كلمة المرور لحساب المريض للولوج إلى Patient Portal
+    while True:
+        password = input("  Account Pass   (Patient Portal password) [or 'cancel']: ").strip()
+        if password.lower() == "cancel":
+            return
+        if password:
+            break
+        print("\n[ERROR] Password cannot be empty. Please try again.\n")
+
+    case_type = input("  Diagnosis/Case [or 'cancel']: ").strip()
+    if case_type.lower() == "cancel":
+        return
+
+    try:
+        if p_type == "2":
+            new_p = EmergencyPatient(p_id, name, phone, age, case_type, password=password)
+        else:
+            new_p = RegularPatient(p_id, name, phone, age, case_type, password=password)
+        manager.register_patient(new_p)
+        # حفظ فوري تلقائي
+        manager.save_to_file("clinic_data.json", silent=True)
+        
+        p_type_label = "Emergency (High Priority)" if p_type == "2" else "Regular"
+        print(f"\n[SUCCESS] Patient registered successfully!")
+        print(f"  Profile: {new_p.display_profile()}")
+        print("+" + "-" * 54 + "+")
+        print("|" + "REGISTRATION DETAILS".center(54) + "|")
+        print("+" + "-" * 54 + "+")
+        id_badge = f">>> YOUR ASSIGNED PATIENT ID: {p_id} <<<"
+        print("|" + id_badge.center(54) + "|")
+        print("+" + "-" * 54 + "+")
+        print(f"|  Patient Name  : {new_p.name:<35} |")
+        print(f"|  Patient Type  : {p_type_label:<35} |")
+        print(f"|  Phone Number  : {new_p.phone:<35} |")
+        print(f"|  Age           : {str(new_p.age):<35} |")
+        print(f"|  Account Pass  : {password:<35} |")
+        print(f"|  Diagnosis     : {(new_p.case_type or 'General Checkup'):<35} |")
+        print("+" + "-" * 54 + "+\n")
+    except ClinicError as err:
+        print(f"\n[ERROR] Registration failed: {err}\n")
+
+
+def action_add_doctor(manager: ClinicManager):
+    """إضافة طبيب جديد للعيادة وتعيين تخصصه وحالته"""
+    print_section_header("ADD DOCTOR")
+    if manager.current_user is not None and not manager.current_user.has_permission("add_doctor"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    # كود الدكتور (يقبل إدخال يدوي أو توليد تلقائي بـ randint)
+    while True:
+        d_id = input("  Doctor ID      (Press Enter for auto-id, or doctor-<num>) [or 'cancel']: ").strip()
+        if d_id.lower() == "cancel":
+            return
+        if not d_id:
+            d_id = manager.generate_unique_doctor_id()
+            print(f"\n[INFO] Generated Doctor ID: {d_id}\n")
+            break
+        if not validate_doctor_id(d_id):
+            print(f"\n[ERROR] Invalid doctor ID format: '{d_id}'. Expected 'doctor-<number>'. Please try again.\n")
+            continue
+        if d_id in manager.doctors:
+            print(f"\n[ERROR] Doctor with ID '{d_id}' already exists. Please enter a different ID.\n")
+            continue
+        break
+
+    # الاسم
+    while True:
+        name = input("  Doctor Name    [or 'cancel']: ").strip()
+        if name.lower() == "cancel":
+            return
+        if name:
+            break
+        print("\n[ERROR] Doctor name cannot be empty. Please try again.\n")
+
+    # رقم التليفون
+    while True:
+        phone = input("  Phone Number   (11 digits, e.g. 01112345678) [or 'cancel']: ").strip()
+        if phone.lower() == "cancel":
+            return
+        if not validate_phone(phone):
+            print(f"\n[ERROR] Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.\n")
+            continue
+        break
+
+    specialty = input("  Specialty      [or 'cancel']: ").strip()
+    if specialty.lower() == "cancel":
+        return
+
+    try:
+        new_doc = Doctor(d_id, name, phone, specialty)
+        manager.add_doctor(new_doc)
+        # حفظ فوري تلقائي
+        manager.save_to_file("clinic_data.json", silent=True)
+        print(f"\n[SUCCESS] Doctor added successfully!")
+        print(f"  Profile: {new_doc.display_profile()}\n")
+    except ClinicError as err:
+        print(f"\n[ERROR] Failed to add doctor: {err}\n")
+
+
+def action_book_appointment(manager: ClinicManager):
+    """حجز موعد كشف جديد مع الطبيب والتحقق من التعارض والوقت"""
+    print_section_header("BOOK APPOINTMENT")
+    if manager.current_user is not None and not manager.current_user.has_permission("book_appointment"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    if not manager.doctors:
+        print("\n[ERROR] No doctors available in the clinic. Please add a doctor first.\n")
+        return
+    if not manager.patients:
+        print("\n[ERROR] No patients registered yet. Please register a patient first.\n")
+        return
+
+    # عرض قائمة الدكاترة المتاحين باستخدام display_profile()
+    print("\nAvailable Doctors in Clinic:")
+    print("  " + "-" * 75)
+    for d in manager.doctors.values():
+        print(f"  * {d.display_profile()}")
+    print("  " + "-" * 75 + "\n")
+
+    # اختيار المريض
+    while True:
+        p_id = input("  Patient ID     (e.g. patient-123) [or 'cancel' to exit]: ").strip()
+        if p_id.lower() == "cancel":
+            return
+        if p_id not in manager.patients:
+            print(f"\n[ERROR] Patient ID '{p_id}' not found in system. Please try again.\n")
+            continue
+        break
+
+    # اختيار الدكتور
+    while True:
+        d_id = input("  Doctor ID      (e.g. doctor-101)  [or 'cancel' to exit]: ").strip()
+        if d_id.lower() == "cancel":
+            return
+        if d_id not in manager.doctors:
+            print(f"\n[ERROR] Doctor ID '{d_id}' not found in system. Please try again.\n")
+            continue
+        if not manager.doctors[d_id].availability:
+            print(f"\n[ERROR] Dr. {manager.doctors[d_id].name} is marked as unavailable. Please choose another doctor.\n")
+            continue
+        break
+
+    # تحديد الموعد
+    while True:
+        time_input = input("  Date & Time    (YYYY-MM-DD HH:MM) [or 'cancel' to exit]: ").strip()
+        if time_input.lower() == "cancel":
+            return
+        try:
+            appt = manager.book_appointment(p_id, d_id, time_input)
+            # حفظ فوري تلقائي
+            manager.save_to_file("clinic_data.json", silent=True)
+            print(f"\n[SUCCESS] Booked appointment successfully!")
+            print(f"   Patient : {appt.patient.name} ({appt.patient.person_id})")
+            print(f"   Doctor  : Dr. {appt.doctor.name} ({appt.doctor.person_id})")
+            time_disp = appt.time.strftime('%Y-%m-%d %H:%M') if isinstance(appt.time, datetime) else str(appt.time)
+            print(f"   Time    : {time_disp}")
+            print(f"   Fee     : ${appt.fee:.2f}\n")
+            break
+        except (InvalidAppointmentTimeError, DuplicateBookingError, ClinicError) as err:
+            print(f"\n[ERROR] {err}. Please try again.\n")
+
+
+def action_update_visit_status(manager: ClinicManager):
+    """تحديث حالة موعد كشف (pending / completed / cancelled / in_progress)"""
+    print_section_header("UPDATE VISIT STATUS")
+    if manager.current_user is not None and not manager.current_user.has_permission("update_visit_status"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    if not manager.appointments:
+        print("\n[INFO] No appointments found in the system.\n")
+        return
+
+    print("\nCurrent Appointments:")
+    print("  " + "-" * 75)
+    for idx, a in enumerate(manager.appointments):
+        time_s = a.time.strftime("%Y-%m-%d %H:%M") if isinstance(a.time, datetime) else str(a.time)
+        print(f"  [{idx}] Patient: {a.patient.person_id:<12} | Dr. {a.doctor.name:<15} | Time: {time_s} | Status: {a.status.upper()}")
+    print("  " + "-" * 75 + "\n")
+
+    # اختيار رقم الموعد
+    while True:
+        idx_input = input("  Appointment Index [or 'cancel' to exit]: ").strip()
+        if idx_input.lower() == "cancel":
+            return
+        try:
+            idx = int(idx_input)
+            if idx < 0 or idx >= len(manager.appointments):
+                print(f"\n[ERROR] Index must be between 0 and {len(manager.appointments) - 1}. Please try again.\n")
+                continue
+            break
+        except ValueError:
+            print(f"\n[ERROR] '{idx_input}' is not a valid integer. Please try again.\n")
+
+    # اختيار الحالة الجديدة (يقبل نصوص مرنة)
+    while True:
+        raw_status = input("  New Status (pending / completed / cancelled / in_progress) [or 'cancel']: ").strip()
+        if raw_status.lower() == "cancel":
+            return
+        norm_status = parse_status(raw_status)
+        if not norm_status:
+            print(f"\n[ERROR] Invalid status '{raw_status}'. Allowed: pending, completed, cancelled, in_progress.\n")
+            continue
+        try:
+            updated = manager.update_visit_status(idx, norm_status)
+            # حفظ فوري تلقائي
+            manager.save_to_file("clinic_data.json", silent=True)
+            print(f"\n[SUCCESS] Updated appointment [{idx}] status to '{updated.status.upper()}'.\n")
+            break
+        except (ValueError, DuplicateBookingError, ClinicError) as err:
+            print(f"\n[ERROR] Update failed: {err}. Please try again.\n")
+
+
+def action_show_queue(manager: ClinicManager):
+    """عرض طابور الانتظار المرتب بالأولوية والوقت بواسطة الكاستم إيتريتور"""
+    cols = [
+        ('#', 4, '<'),
+        ('Priority', 15, '<'),
+        ('Patient', 22, '<'),
+        ('Doctor', 20, '<'),
+        ('Appointment Time', 18, '<'),
+        ('Fee', 10, '<'),
+    ]
+    header_cells = [f"{title:{align}{w}}" for title, w, align in cols]
+    header_row = "| " + " | ".join(header_cells) + " |"
+    sep_parts = ["-" * (w + 2) for _, w, _ in cols]
+    sep = "+" + "+".join(sep_parts) + "+"
+    full_w = len(sep) - 2
+
+    print_section_header("WAITING QUEUE (Emergency First, by Priority & Time)", width=full_w)
+    print(sep)
+    print(header_row)
+    print(sep)
+
+    queue_iter = manager.get_waiting_queue_iterator()
+    count = 0
+    for appt in queue_iter:
+        count += 1
+        is_emergency = (appt.patient.priority_level() == 1)
+        # تمييز صفوف الطوارئ بـ [!] EMERGENCY عشان تبان واضحة ومميزة
+        priority_label = "[!] EMERGENCY" if is_emergency else "    REGULAR  "
+        p_display = f"{appt.patient.name} ({appt.patient.person_id})"
+        d_display = f"Dr. {appt.doctor.name}"
+        t_display = appt.time.strftime('%Y-%m-%d %H:%M') if isinstance(appt.time, datetime) else str(appt.time)
+        fee_display = f"${appt.fee:.2f}"
+
+        row_cells = [
+            f"{str(count):<4}",
+            f"{priority_label:<15}",
+            f"{p_display:<22}",
+            f"{d_display:<20}",
+            f"{t_display:<18}",
+            f"{fee_display:<10}"
+        ]
+        print("| " + " | ".join(row_cells) + " |")
+
+    if count == 0:
+        empty_msg = "Queue is currently empty (no pending appointments in line)."
+        print("| " + empty_msg.ljust(full_w - 2) + " |")
+
+    print(sep + "\n")
+
+
+def action_toggle_doctor_availability(manager: ClinicManager):
+    """تبديل حالة توفر الطبيب (متاح / غير متاح)"""
+    print_section_header("TOGGLE DOCTOR AVAILABILITY")
+    if manager.current_user is not None and not manager.current_user.has_permission("toggle_doctor_availability"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    if not manager.doctors:
+        print("\n[ERROR] No doctors registered in the clinic yet.\n")
+        return
+
+    print("\nCurrent Doctors in Clinic:")
+    print("  " + "-" * 75)
+    for d in manager.doctors.values():
+        print(f"  * {d.display_profile()}")
+    print("  " + "-" * 75 + "\n")
+
+    while True:
+        d_id = input("  Doctor ID      (e.g. doctor-101)  [or 'cancel' to exit]: ").strip()
+        if d_id.lower() == "cancel":
+            return
+        if d_id not in manager.doctors:
+            print(f"\n[ERROR] Doctor ID '{d_id}' not found in clinic. Please try again.\n")
+            continue
+        try:
+            new_avail = manager.toggle_doctor_availability(d_id)
+            manager.save_to_file("clinic_data.json", silent=True)
+            doc = manager.doctors[d_id]
+            status_str = "AVAILABLE" if new_avail else "UNAVAILABLE (Busy)"
+            print(f"\n[SUCCESS] Dr. {doc.name} is now marked as {status_str}!")
+            print(f"  Updated Profile: {doc.display_profile()}\n")
+            break
+        except ClinicError as err:
+            print(f"\n[ERROR] Failed to toggle doctor availability: {err}\n")
+            break
+
+
+def action_delete_appointment(manager: ClinicManager):
+    """حذف موعد محدد من النظام مع تحرير وقت الطبيب وتحديث العدادات"""
+    print_section_header("DELETE APPOINTMENT (One Delete Action)")
+    if manager.current_user is not None and not manager.current_user.has_permission("delete_appointment"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    if not manager.appointments:
+        print("\n[INFO] No appointments found in the system to delete.\n")
+        return
+
+    print("\nCurrent Appointments:")
+    print("  " + "-" * 75)
+    for idx, a in enumerate(manager.appointments):
+        time_s = a.time.strftime("%Y-%m-%d %H:%M") if isinstance(a.time, datetime) else str(a.time)
+        print(f"  [{idx}] Patient: {a.patient.person_id:<12} | Dr. {a.doctor.name:<15} | Time: {time_s} | Status: {a.status.upper()}")
+    print("  " + "-" * 75 + "\n")
+
+    while True:
+        idx_input = input("  Appointment Index to DELETE [or 'cancel' to exit]: ").strip()
+        if idx_input.lower() == "cancel":
+            return
+        try:
+            idx = int(idx_input)
+            if idx < 0 or idx >= len(manager.appointments):
+                print(f"\n[ERROR] Index must be between 0 and {len(manager.appointments) - 1}. Please try again.\n")
+                continue
+            confirm = input(f"  Are you sure you want to permanently delete appointment [{idx}]? (yes/no): ").strip().lower()
+            if confirm not in ("yes", "y", "نعم", "موافق", "confirm", "تاكيد"):
+                print("\n[INFO] Deletion cancelled. Appointment was not deleted.\n")
+                return
+
+            deleted = manager.delete_appointment(idx)
+            manager.save_to_file("clinic_data.json", silent=True)
+            time_disp = deleted.time.strftime('%Y-%m-%d %H:%M') if isinstance(deleted.time, datetime) else str(deleted.time)
+            print(f"\n[SUCCESS] Appointment [{idx}] deleted successfully!")
+            print(f"  Patient Record : {deleted.patient.display_profile()}")
+            print(f"  Doctor Record  : {deleted.doctor.display_profile()}")
+            print(f"  Freed Slot     : {time_disp}")
+            if deleted.patient.priority_level() == 1:
+                rem_emg = manager.fee_calculator.get_emergency_count() if hasattr(manager.fee_calculator, "get_emergency_count") else 0
+                print(f"  Emergency Count: Decremented in triage closure (Active: {rem_emg})")
+            print()
+            break
+        except (ValueError, ClinicError) as err:
+            print(f"\n[ERROR] Deletion failed: {err}. Please try again.\n")
+
+
+def action_daily_report(manager: ClinicManager):
+    """عرض التقرير اليومي الشامل للعيادة"""
+    manager.daily_report()
+
+
+def action_save_data(manager: ClinicManager):
+    """حفظ قاعدة بيانات العيادة إلى ملف JSON"""
+    manager.save_to_file("clinic_data.json")
+
+
+def action_reset_data(manager: ClinicManager):
+    """إعادة ضبط قاعدة بيانات العيادة وتصفير كافة السجلات"""
+    print_section_header("RESET CLINIC DATA")
+    if manager.current_user is not None and not manager.current_user.has_permission("reset_database"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    print("  WARNING: This will permanently delete ALL registered patients,")
+    print("  doctors, and scheduled appointments from memory and 'clinic_data.json'.\n")
+    confirm = input("  Are you sure you want to reset all clinic data? (yes/no): ").strip().lower()
+    if confirm in ("yes", "y", "نعم", "موافق", "confirm", "تاكيد"):
+        try:
+            manager.reset_database("clinic_data.json")
+            print(f"\n[SUCCESS] All clinic data has been reset successfully. Database is now clean.\n")
+        except ClinicError as err:
+            print(f"\n[ERROR] Reset failed: {err}\n")
+    else:
+        print(f"\n[INFO] Data reset cancelled. Your existing clinic records are intact.\n")
+
+
+def action_export_report(manager: ClinicManager):
+    """تصدير التقرير اليومي إلى ملف نصي"""
+    print_section_header("EXPORT DAILY REPORT")
+    if manager.current_user is not None and not manager.current_user.has_permission("export_report"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    export_path = input("  File path to export [Default: 'daily_report.txt'] [or 'cancel']: ").strip()
+    if export_path.lower() == "cancel":
+        return
+    target_path = export_path if export_path else "daily_report.txt"
+    try:
+        manager.export_report_to_file(target_path)
+    except ClinicError as err:
+        print(f"\n[ERROR] {err}\n")
+
+
+def action_patient_history(manager: ClinicManager):
+    """عرض سجل الزيارات المكتملة لمريض عبر دالة العودية والتخزين المؤقت"""
+    print_section_header("PATIENT HISTORY (Recursive & Memoized)")
+    if manager.current_user is not None and not manager.current_user.has_permission("view_history"):
+        print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
+        return
+
+    if not manager.patients:
+        print("\n[INFO] No registered patients in system.\n")
+        return
+
+    p_id = input("  Patient ID     (e.g. patient-123) [or 'cancel' to exit]: ").strip()
+    if p_id.lower() == "cancel":
+        return
+    try:
+        completed_visits, is_hit = manager.get_patient_completed_visits(p_id, return_status=True)
+        patient = manager.patients[p_id]
+        status_tag = "[CACHE HIT]" if is_hit else "[COMPUTED]"
+
+        print(f"\n{status_tag} Completed visits for Patient {patient.name} ({patient.person_id}):")
+        print("  " + "-" * 65)
+        if not completed_visits:
+            print("  No completed visits found for this patient.")
+        else:
+            for v_idx, v in enumerate(completed_visits, 1):
+                v_time = v.time.strftime("%Y-%m-%d %H:%M") if isinstance(v.time, datetime) else str(v.time)
+                print(f"  {v_idx}. Dr. {v.doctor.name:<16} ({v.doctor.specialty:<12}) | Time: {v_time} | Fee: ${v.fee:.2f}")
+        print("  " + "-" * 65)
+        print(f"  Total completed visits: {len(completed_visits)}\n")
+    except ClinicError as err:
+        print(f"\n[ERROR] {err}\n")
+
+
+# ---------- Patient Portal Actions (Data-Scoped by patient_id) ----------
+
+def action_view_own_appointments(manager: ClinicManager, patient_id: str):
+    """عرض كافة مواعيد المريض الحالي المسجلة في العيادة"""
+    print_section_header("MY APPOINTMENTS")
+    patient_appts = [a for a in manager.appointments if a.patient.person_id == patient_id]
+
+    if not patient_appts:
+        print("\n[INFO] You do not have any scheduled appointments currently.\n")
+        return
+
+    print(f"\nAppointments for Patient ID: {patient_id}")
+    print("  " + "-" * 75)
+    for idx, a in enumerate(patient_appts, 1):
+        time_s = a.time.strftime("%Y-%m-%d %H:%M") if isinstance(a.time, datetime) else str(a.time)
+        print(f"  {idx}. Dr. {a.doctor.name:<15} ({a.doctor.specialty:<12}) | Time: {time_s} | Status: {a.status.upper()} | Fee: ${a.fee:.2f}")
+    print("  " + "-" * 75)
+    print(f"  Total appointments found: {len(patient_appts)}\n")
+
+
+def action_view_own_queue_position(manager: ClinicManager, patient_id: str):
+    """عرض ترتيب المريض الحالي في طابور الانتظار (Pending) بدقة وفقاً للأولوية"""
+    print_section_header("MY QUEUE POSITION")
+    waiting_queue = manager.sort_queue_by_priority()
+
+    position = None
+    patient_appt = None
+    for idx, appt in enumerate(waiting_queue, 1):
+        if appt.patient.person_id == patient_id:
+            position = idx
+            patient_appt = appt
+            break
+
+    if position is None:
+        print(f"\n[INFO] Patient [{patient_id}] has no pending appointments in the waiting queue.\n")
+        return
+
+    time_s = patient_appt.time.strftime("%Y-%m-%d %H:%M") if isinstance(patient_appt.time, datetime) else str(patient_appt.time)
+    p_level = "Emergency (High Priority)" if patient_appt.patient.priority_level() == 1 else "Regular Priority"
+
+    print("\n+" + "=" * 54 + "+")
+    print("|" + "YOUR QUEUE STATUS".center(54) + "|")
+    print("+" + "=" * 54 + "+")
+    pos_badge = f">>> CURRENT QUEUE POSITION: #{position} <<<"
+    print("|" + pos_badge.center(54) + "|")
+    print("+" + "-" * 54 + "+")
+    print(f"|  Doctor        : Dr. {patient_appt.doctor.name:<33} |")
+    print(f"|  Time Slot     : {time_s:<35} |")
+    print(f"|  Priority      : {p_level:<35} |")
+    print(f"|  Total Waiting : {str(len(waiting_queue)):<35} |")
+    print("+" + "=" * 54 + "+\n")
+
+
+def action_view_own_history(manager: ClinicManager, patient_id: str):
+    """عرض السجل الطبي وتاريخ الزيارات المكتملة للمريض الحالي مع التخزين المؤقت"""
+    print_section_header("MY VISIT HISTORY (Completed Visits)")
+    try:
+        completed_visits, is_hit = manager.get_patient_completed_visits(patient_id, return_status=True)
+        patient = manager.patients.get(patient_id)
+        p_name = patient.name if patient else patient_id
+        status_tag = "[CACHE HIT]" if is_hit else "[COMPUTED]"
+
+        print(f"\n{status_tag} Medical history for {p_name} ({patient_id}):")
+        print("  " + "-" * 65)
+        if not completed_visits:
+            print("  No completed visits found in your medical history.")
+        else:
+            for v_idx, v in enumerate(completed_visits, 1):
+                v_time = v.time.strftime("%Y-%m-%d %H:%M") if isinstance(v.time, datetime) else str(v.time)
+                print(f"  {v_idx}. Dr. {v.doctor.name:<16} ({v.doctor.specialty:<12}) | Time: {v_time} | Fee: ${v.fee:.2f}")
+        print("  " + "-" * 65)
+        print(f"  Total completed visits: {len(completed_visits)}\n")
+    except ClinicError as err:
+        print(f"\n[ERROR] {err}\n")
+
+
+# =========================================================
+# ROLE-SPECIFIC MENUS
+# =========================================================
+
+def run_staff_menu(manager: ClinicManager, current_user: StaffUser):
+    """منيو موظف العيادة (Staff) - 13 خياراً منظماً يشمل الإدارة والتقارير والحفظ"""
+    while True:
+        menu_title = f"CLINIC MAIN MENU - {current_user.display_role()}"
+        print("\n+" + "=" * 54 + "+")
+        print("|" + menu_title.center(54) + "|")
+        print("+" + "=" * 54 + "+")
+        print("|  [1] Register Patient     : Add new patient record   |")
+        print("|  [2] Add Doctor           : Register medical doctor  |")
+        print("|  [3] Book Appointment     : Schedule a clinic visit  |")
+        print("|  [4] Update Visit Status  : Manage appointment state |")
+        print("|  [5] Show Waiting Queue   : View prioritized queue   |")
+        print("|  [6] Toggle Doctor Status : Set available / busy     |")
+        print("|  [7] Delete Appointment   : Remove record (Delete)   |")
+        print("|  [8] Daily Report         : View clinic statistics   |")
+        print("|  [9] Save Data Now        : Save database to JSON    |")
+        print("|  [10] Reset Clinic Data   : Clear all saved records  |")
+        print("|  [11] Export Report       : Save report to .txt file |")
+        print("|  [12] Patient History     : Completed visits (memo)  |")
+        print("|  [13] Quit (Auto-Save)    : Save data and exit       |")
+        print("+" + "-" * 54 + "+")
+
+        raw_choice = input("\nEnter choice (1-13): ").strip()
+        choice = parse_menu_choice(raw_choice)
+
+        if choice == "1":
+            action_register_patient(manager)
+        elif choice == "2":
+            action_add_doctor(manager)
+        elif choice == "3":
+            action_book_appointment(manager)
+        elif choice == "4":
+            action_update_visit_status(manager)
+        elif choice == "5":
+            action_show_queue(manager)
+        elif choice == "6":
+            action_toggle_doctor_availability(manager)
+        elif choice == "7":
+            action_delete_appointment(manager)
+        elif choice == "8":
+            action_daily_report(manager)
+        elif choice == "9":
+            action_save_data(manager)
+        elif choice == "10":
+            action_reset_data(manager)
+        elif choice == "11":
+            action_export_report(manager)
+        elif choice == "12":
+            action_patient_history(manager)
+        elif choice == "13":
+            print("\n" + "-" * 54)
+            print(" Saving clinic database before exiting...")
+            manager.save_to_file("clinic_data.json", silent=True)
+            print("+" + "=" * 54 + "+")
+            print("|" + "Thank you for using Smart Clinic Queue System!".center(54) + "|")
+            print("|" + "Data saved successfully. Goodbye!".center(54) + "|")
+            print("+" + "=" * 54 + "+\n")
+            break
+        else:
+            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 13 (e.g. '1' or 'Register').\n")
+
+
+def run_doctor_menu(manager: ClinicManager, current_user: DoctorUser):
+    """منيو الطبيب (Doctor) - 5 خيارات مخصصة للعمليات الطبية"""
+    while True:
+        doc_title = f"DOCTOR PORTAL - {current_user.username}"
+        print("\n+" + "=" * 54 + "+")
+        print("|" + doc_title.center(54) + "|")
+        print("+" + "=" * 54 + "+")
+        print("|  [1] Show Waiting Queue   : View prioritized queue   |")
+        print("|  [2] Update Visit Status  : Manage appointment state |")
+        print("|  [3] Daily Report         : View clinic statistics   |")
+        print("|  [4] Patient History     : Completed visits (memo)  |")
+        print("|  [5] Quit (Auto-Save)    : Save data and exit       |")
+        print("+" + "-" * 54 + "+")
+
+        raw_choice = input("\nEnter choice (1-5): ").strip().lower()
+
+        if raw_choice in ("1", "queue", "show queue", "show", "طابور"):
+            action_show_queue(manager)
+        elif raw_choice in ("2", "update", "status", "update status", "تحديث حالة"):
+            action_update_visit_status(manager)
+        elif raw_choice in ("3", "report", "daily report", "تقرير"):
+            action_daily_report(manager)
+        elif raw_choice in ("4", "history", "patient history", "completed visits", "سجل"):
+            action_patient_history(manager)
+        elif raw_choice in ("5", "quit", "exit", "q", "خروج"):
+            print("\n" + "-" * 54)
+            print(" Saving clinic database before exiting...")
+            manager.save_to_file("clinic_data.json", silent=True)
+            print("+" + "=" * 54 + "+")
+            print("|" + "Thank you for using Smart Clinic Queue System!".center(54) + "|")
+            print("|" + "Data saved successfully. Goodbye!".center(54) + "|")
+            print("+" + "=" * 54 + "+\n")
+            break
+        else:
+            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 5.\n")
+
+
+def run_patient_menu(manager: ClinicManager, current_user: PatientUser):
+    """منيو بوابة المريض (Patient Portal) - مقيد تماماً ببيانات المريض الحالي فقط"""
+    p_id = current_user.patient_id
+    p_name = current_user.username
+
+    while True:
+        portal_title = f"PATIENT PORTAL - {p_name}"
+        print("\n+" + "=" * 54 + "+")
+        print("|" + portal_title.center(54) + "|")
+        print("+" + "=" * 54 + "+")
+        print("|  [1] My Appointments     : View scheduled visits     |")
+        print("|  [2] My Queue Position   : Check current wait status |")
+        print("|  [3] My Visit History    : Completed medical visits  |")
+        print("|  [4] Logout / Quit       : Exit portal safely        |")
+        print("+" + "-" * 54 + "+")
+
+        raw_choice = input("\nEnter choice (1-4): ").strip().lower()
+
+        if raw_choice in ("1", "appointments", "my appointments", "مواعيدي"):
+            action_view_own_appointments(manager, p_id)
+        elif raw_choice in ("2", "queue", "my queue", "position", "دوري"):
+            action_view_own_queue_position(manager, p_id)
+        elif raw_choice in ("3", "history", "my history", "visits", "سجلي"):
+            action_view_own_history(manager, p_id)
+        elif raw_choice in ("4", "logout", "quit", "exit", "q", "خروج"):
+            print("\n" + "-" * 54)
+            print(" Saving clinic database before exiting...")
+            manager.save_to_file("clinic_data.json", silent=True)
+            print("+" + "=" * 54 + "+")
+            print("|" + f"Goodbye, {p_name}!".center(54) + "|")
+            print("|" + "Wishing you great health!".center(54) + "|")
+            print("+" + "=" * 54 + "+\n")
+            break
+        else:
+            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 4.\n")
+
+
+# =========================================================
+# MAIN ENTRY POINT
+# =========================================================
+
 def main():
     manager = ClinicManager(base_fee=100.0)
 
-    # 1. شاشة تسجيل الدخول الإلزامية أولاً
-    current_user = login_screen()
-    manager.set_current_user(current_user)
-
-    # 2. تحميل البيانات التلقائي عند بدء التشغيل
+    # 1. تحميل البيانات التلقائي عند بدء التشغيل لضمان استرجاع كافة الحسابات
     manager.load_from_file("clinic_data.json")
 
+    # 2. شاشة تسجيل الدخول الإلزامية
+    current_user = login_screen(manager)
+    manager.set_current_user(current_user)
+
+    # 3. توجيه المستخدم للمنيو المخصصة لدوره
     try:
-        while True:
-            # المنيو الرئيسية في فريم منظم يعرض الدور الوظيفي للمستخدم الحالي
-            menu_title = f"CLINIC MAIN MENU - {current_user.display_role()}"
-            print("\n+" + "=" * 54 + "+")
-            print("|" + menu_title.center(54) + "|")
-            print("+" + "=" * 54 + "+")
-            print("|  [1] Register Patient     : Add new patient record   |")
-            print("|  [2] Add Doctor           : Register medical doctor  |")
-            print("|  [3] Book Appointment     : Schedule a clinic visit  |")
-            print("|  [4] Update Visit Status  : Manage appointment state |")
-            print("|  [5] Show Waiting Queue   : View prioritized queue   |")
-            print("|  [6] Toggle Doctor Status : Set available / busy     |")
-            print("|  [7] Delete Appointment   : Remove record (Delete)   |")
-            print("|  [8] Daily Report         : View clinic statistics   |")
-            print("|  [9] Save Data Now        : Save database to JSON    |")
-            print("|  [10] Reset Clinic Data   : Clear all saved records  |")
-            print("|  [11] Quit (Auto-Save)    : Save data and exit       |")
-            print("|  [12] Export Report       : Save report to .txt file |")
-            print("|  [13] Patient History     : Completed visits (memo)  |")
-            print("+" + "-" * 54 + "+")
-
-            raw_choice = input("\nEnter choice (1-13): ").strip()
-            choice = parse_menu_choice(raw_choice)
-
-            if choice == "1":
-                print_section_header("REGISTER PATIENT")
-                # فحص مسبق للصلاحية لتنبيه المستخدم مباشرة
-                if not current_user.has_permission("register_patient"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                # نوع المريض (يقبل 1، 2، Regular، Emergency، عادي، طوارئ)
-                while True:
-                    raw_type = input("  Patient Type   (1: Regular, 2: Emergency) [Default: 1]: ").strip()
-                    p_type = parse_patient_type(raw_type)
-                    if p_type:
-                        break
-                    print("\n[ERROR] Please enter '1' / 'Regular' or '2' / 'Emergency'. Try again.\n")
-
-                p_id = manager.generate_unique_patient_id()
-
-                # الاسم
-                while True:
-                    name = input("  Full Name      [or 'cancel' to exit]: ").strip()
-                    if name.lower() == "cancel":
-                        break
-                    if name:
-                        break
-                    print("\n[ERROR] Patient name cannot be empty. Please try again.\n")
-                if name.lower() == "cancel":
-                    continue
-
-                # رقم التليفون
-                while True:
-                    phone = input("  Phone Number   (11 digits, e.g. 01012345678) [or 'cancel']: ").strip()
-                    if phone.lower() == "cancel":
-                        break
-                    if not validate_phone(phone):
-                        print(f"\n[ERROR] Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.\n")
-                        continue
-                    break
-                if phone.lower() == "cancel":
-                    continue
-
-                # العمر
-                while True:
-                    age_input = input("  Patient Age    [or 'cancel']: ").strip()
-                    if age_input.lower() == "cancel":
-                        break
-                    try:
-                        age = int(age_input)
-                        if age <= 0 or age > 130:
-                            raise ValueError
-                        break
-                    except ValueError:
-                        print(f"\n[ERROR] Age must be a valid positive integer between 1 and 130. Got '{age_input}'. Please try again.\n")
-                if age_input.lower() == "cancel":
-                    continue
-
-                case_type = input("  Diagnosis/Case [or 'cancel']: ").strip()
-                if case_type.lower() == "cancel":
-                    continue
-
-                try:
-                    if p_type == "2":
-                        new_p = EmergencyPatient(p_id, name, phone, age, case_type)
-                    else:
-                        new_p = RegularPatient(p_id, name, phone, age, case_type)
-                    manager.register_patient(new_p)
-                    # حفظ فوري تلقائي
-                    manager.save_to_file("clinic_data.json", silent=True)
-                    
-                    p_type_label = "Emergency (High Priority)" if p_type == "2" else "Regular"
-                    print(f"\n[SUCCESS] Patient registered successfully!")
-                    print(f"  Profile: {new_p.display_profile()}")
-                    print("+" + "-" * 54 + "+")
-                    print("|" + "REGISTRATION DETAILS".center(54) + "|")
-                    print("+" + "-" * 54 + "+")
-                    id_badge = f">>> YOUR ASSIGNED PATIENT ID: {p_id} <<<"
-                    print("|" + id_badge.center(54) + "|")
-                    print("+" + "-" * 54 + "+")
-                    print(f"|  Patient Name  : {new_p.name:<35} |")
-                    print(f"|  Patient Type  : {p_type_label:<35} |")
-                    print(f"|  Phone Number  : {new_p.phone:<35} |")
-                    print(f"|  Age           : {str(new_p.age):<35} |")
-                    print(f"|  Diagnosis     : {(new_p.case_type or 'General Checkup'):<35} |")
-                    print("+" + "-" * 54 + "+\n")
-                except ClinicError as err:
-                    print(f"\n[ERROR] Registration failed: {err}\n")
-
-            elif choice == "2":
-                print_section_header("ADD DOCTOR")
-                if not current_user.has_permission("add_doctor"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                # كود الدكتور (يقبل إدخال يدوي أو توليد تلقائي بـ randint)
-                while True:
-                    d_id = input("  Doctor ID      (Press Enter for auto-id, or doctor-<num>) [or 'cancel']: ").strip()
-                    if d_id.lower() == "cancel":
-                        break
-                    if not d_id:
-                        d_id = manager.generate_unique_doctor_id()
-                        print(f"\n[INFO] Generated Doctor ID: {d_id}\n")
-                        break
-                    if not validate_doctor_id(d_id):
-                        print(f"\n[ERROR] Invalid doctor ID format: '{d_id}'. Expected 'doctor-<number>'. Please try again.\n")
-                        continue
-                    if d_id in manager.doctors:
-                        print(f"\n[ERROR] Doctor with ID '{d_id}' already exists. Please enter a different ID.\n")
-                        continue
-                    break
-                if d_id.lower() == "cancel":
-                    continue
-
-                # الاسم
-                while True:
-                    name = input("  Doctor Name    [or 'cancel']: ").strip()
-                    if name.lower() == "cancel":
-                        break
-                    if name:
-                        break
-                    print("\n[ERROR] Doctor name cannot be empty. Please try again.\n")
-                if name.lower() == "cancel":
-                    continue
-
-                # رقم التليفون
-                while True:
-                    phone = input("  Phone Number   (11 digits, e.g. 01112345678) [or 'cancel']: ").strip()
-                    if phone.lower() == "cancel":
-                        break
-                    if not validate_phone(phone):
-                        print(f"\n[ERROR] Invalid phone number: '{phone}'. Expected 11 digits starting with 01. Please try again.\n")
-                        continue
-                    break
-                if phone.lower() == "cancel":
-                    continue
-
-                specialty = input("  Specialty      [or 'cancel']: ").strip()
-                if specialty.lower() == "cancel":
-                    continue
-
-                try:
-                    new_doc = Doctor(d_id, name, phone, specialty)
-                    manager.add_doctor(new_doc)
-                    # حفظ فوري تلقائي
-                    manager.save_to_file("clinic_data.json", silent=True)
-                    print(f"\n[SUCCESS] Doctor added successfully!")
-                    print(f"  Profile: {new_doc.display_profile()}\n")
-                except ClinicError as err:
-                    print(f"\n[ERROR] Failed to add doctor: {err}\n")
-
-            elif choice == "3":
-                print_section_header("BOOK APPOINTMENT")
-                if not current_user.has_permission("book_appointment"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                if not manager.doctors:
-                    print("\n[ERROR] No doctors available in the clinic. Please add a doctor first.\n")
-                    continue
-                if not manager.patients:
-                    print("\n[ERROR] No patients registered yet. Please register a patient first.\n")
-                    continue
-
-                # عرض قائمة الدكاترة المتاحين باستخدام display_profile()
-                print("\nAvailable Doctors in Clinic:")
-                print("  " + "-" * 75)
-                for d in manager.doctors.values():
-                    print(f"  * {d.display_profile()}")
-                print("  " + "-" * 75 + "\n")
-
-                # اختيار المريض
-                while True:
-                    p_id = input("  Patient ID     (e.g. patient-123) [or 'cancel' to exit]: ").strip()
-                    if p_id.lower() == "cancel":
-                        break
-                    if p_id not in manager.patients:
-                        print(f"\n[ERROR] Patient ID '{p_id}' not found in system. Please try again.\n")
-                        continue
-                    break
-                if p_id.lower() == "cancel":
-                    continue
-
-                # اختيار الدكتور
-                while True:
-                    d_id = input("  Doctor ID      (e.g. doctor-101)  [or 'cancel' to exit]: ").strip()
-                    if d_id.lower() == "cancel":
-                        break
-                    if d_id not in manager.doctors:
-                        print(f"\n[ERROR] Doctor ID '{d_id}' not found in system. Please try again.\n")
-                        continue
-                    if not manager.doctors[d_id].availability:
-                        print(f"\n[ERROR] Dr. {manager.doctors[d_id].name} is marked as unavailable. Please choose another doctor.\n")
-                        continue
-                    break
-                if d_id.lower() == "cancel":
-                    continue
-
-                # تحديد الموعد
-                while True:
-                    time_input = input("  Date & Time    (YYYY-MM-DD HH:MM) [or 'cancel' to exit]: ").strip()
-                    if time_input.lower() == "cancel":
-                        break
-                    try:
-                        appt = manager.book_appointment(p_id, d_id, time_input)
-                        # حفظ فوري تلقائي
-                        manager.save_to_file("clinic_data.json", silent=True)
-                        print(f"\n[SUCCESS] Booked appointment successfully!")
-                        print(f"   Patient : {appt.patient.name} ({appt.patient.person_id})")
-                        print(f"   Doctor  : Dr. {appt.doctor.name} ({appt.doctor.person_id})")
-                        time_disp = appt.time.strftime('%Y-%m-%d %H:%M') if isinstance(appt.time, datetime) else str(appt.time)
-                        print(f"   Time    : {time_disp}")
-                        print(f"   Fee     : ${appt.fee:.2f}\n")
-                        break
-                    except (InvalidAppointmentTimeError, DuplicateBookingError, ClinicError) as err:
-                        print(f"\n[ERROR] {err}. Please try again.\n")
-
-            elif choice == "4":
-                print_section_header("UPDATE VISIT STATUS")
-                if not current_user.has_permission("update_visit_status"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                if not manager.appointments:
-                    print("\n[INFO] No appointments found in the system.\n")
-                    continue
-
-                print("\nCurrent Appointments:")
-                print("  " + "-" * 75)
-                for idx, a in enumerate(manager.appointments):
-                    time_s = a.time.strftime("%Y-%m-%d %H:%M") if isinstance(a.time, datetime) else str(a.time)
-                    print(f"  [{idx}] Patient: {a.patient.person_id:<12} | Dr. {a.doctor.name:<15} | Time: {time_s} | Status: {a.status.upper()}")
-                print("  " + "-" * 75 + "\n")
-
-                # اختيار رقم الموعد
-                while True:
-                    idx_input = input("  Appointment Index [or 'cancel' to exit]: ").strip()
-                    if idx_input.lower() == "cancel":
-                        break
-                    try:
-                        idx = int(idx_input)
-                        if idx < 0 or idx >= len(manager.appointments):
-                            print(f"\n[ERROR] Index must be between 0 and {len(manager.appointments) - 1}. Please try again.\n")
-                            continue
-                        break
-                    except ValueError:
-                        print(f"\n[ERROR] '{idx_input}' is not a valid integer. Please try again.\n")
-                if idx_input.lower() == "cancel":
-                    continue
-
-                # اختيار الحالة الجديدة (يقبل نصوص مرنة)
-                while True:
-                    raw_status = input("  New Status (pending / completed / cancelled / in_progress) [or 'cancel']: ").strip()
-                    if raw_status.lower() == "cancel":
-                        break
-                    norm_status = parse_status(raw_status)
-                    if not norm_status:
-                        print(f"\n[ERROR] Invalid status '{raw_status}'. Allowed: pending, completed, cancelled, in_progress.\n")
-                        continue
-                    try:
-                        updated = manager.update_visit_status(idx, norm_status)
-                        # حفظ فوري تلقائي
-                        manager.save_to_file("clinic_data.json", silent=True)
-                        print(f"\n[SUCCESS] Updated appointment [{idx}] status to '{updated.status.upper()}'.\n")
-                        break
-                    except (ValueError, DuplicateBookingError, ClinicError) as err:
-                        print(f"\n[ERROR] Update failed: {err}. Please try again.\n")
-
-            elif choice == "5":
-                # قائمة انتظار المرضى في جدول منظم بمحاذاة ثابتة وتمييز حالات الطوارئ
-                cols = [
-                    ('#', 4, '<'),
-                    ('Priority', 15, '<'),
-                    ('Patient', 22, '<'),
-                    ('Doctor', 20, '<'),
-                    ('Appointment Time', 18, '<'),
-                    ('Fee', 10, '<'),
-                ]
-                header_cells = [f"{title:{align}{w}}" for title, w, align in cols]
-                header_row = "| " + " | ".join(header_cells) + " |"
-                sep_parts = ["-" * (w + 2) for _, w, _ in cols]
-                sep = "+" + "+".join(sep_parts) + "+"
-                full_w = len(sep) - 2
-
-                print_section_header("WAITING QUEUE (Emergency First, by Priority & Time)", width=full_w)
-                print(sep)
-                print(header_row)
-                print(sep)
-
-                queue_iter = manager.get_waiting_queue_iterator()
-                count = 0
-                for appt in queue_iter:
-                    count += 1
-                    is_emergency = (appt.patient.priority_level() == 1)
-                    # تمييز صفوف الطوارئ بـ [!] EMERGENCY عشان تبان واضحة ومميزة
-                    priority_label = "[!] EMERGENCY" if is_emergency else "    REGULAR  "
-                    p_display = f"{appt.patient.name} ({appt.patient.person_id})"
-                    d_display = f"Dr. {appt.doctor.name}"
-                    t_display = appt.time.strftime('%Y-%m-%d %H:%M') if isinstance(appt.time, datetime) else str(appt.time)
-                    fee_display = f"${appt.fee:.2f}"
-
-                    row_cells = [
-                        f"{str(count):<4}",
-                        f"{priority_label:<15}",
-                        f"{p_display:<22}",
-                        f"{d_display:<20}",
-                        f"{t_display:<18}",
-                        f"{fee_display:<10}"
-                    ]
-                    print("| " + " | ".join(row_cells) + " |")
-
-                if count == 0:
-                    empty_msg = "Queue is currently empty (no pending appointments in line)."
-                    print("| " + empty_msg.ljust(full_w - 2) + " |")
-
-                print(sep + "\n")
-
-            elif choice == "6":
-                print_section_header("TOGGLE DOCTOR AVAILABILITY")
-                if not current_user.has_permission("toggle_doctor_availability"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                if not manager.doctors:
-                    print("\n[ERROR] No doctors registered in the clinic yet.\n")
-                    continue
-
-                print("\nCurrent Doctors in Clinic:")
-                print("  " + "-" * 75)
-                for d in manager.doctors.values():
-                    print(f"  * {d.display_profile()}")
-                print("  " + "-" * 75 + "\n")
-
-                while True:
-                    d_id = input("  Doctor ID      (e.g. doctor-101)  [or 'cancel' to exit]: ").strip()
-                    if d_id.lower() == "cancel":
-                        break
-                    if d_id not in manager.doctors:
-                        print(f"\n[ERROR] Doctor ID '{d_id}' not found in clinic. Please try again.\n")
-                        continue
-                    try:
-                        new_avail = manager.toggle_doctor_availability(d_id)
-                        manager.save_to_file("clinic_data.json", silent=True)
-                        doc = manager.doctors[d_id]
-                        status_str = "AVAILABLE" if new_avail else "UNAVAILABLE (Busy)"
-                        print(f"\n[SUCCESS] Dr. {doc.name} is now marked as {status_str}!")
-                        print(f"  Updated Profile: {doc.display_profile()}\n")
-                        break
-                    except ClinicError as err:
-                        print(f"\n[ERROR] Failed to toggle doctor availability: {err}\n")
-                        break
-
-            elif choice == "7":
-                print_section_header("DELETE APPOINTMENT (One Delete Action)")
-                if not current_user.has_permission("delete_appointment"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                if not manager.appointments:
-                    print("\n[INFO] No appointments found in the system to delete.\n")
-                    continue
-
-                print("\nCurrent Appointments:")
-                print("  " + "-" * 75)
-                for idx, a in enumerate(manager.appointments):
-                    time_s = a.time.strftime("%Y-%m-%d %H:%M") if isinstance(a.time, datetime) else str(a.time)
-                    print(f"  [{idx}] Patient: {a.patient.person_id:<12} | Dr. {a.doctor.name:<15} | Time: {time_s} | Status: {a.status.upper()}")
-                print("  " + "-" * 75 + "\n")
-
-                while True:
-                    idx_input = input("  Appointment Index to DELETE [or 'cancel' to exit]: ").strip()
-                    if idx_input.lower() == "cancel":
-                        break
-                    try:
-                        idx = int(idx_input)
-                        if idx < 0 or idx >= len(manager.appointments):
-                            print(f"\n[ERROR] Index must be between 0 and {len(manager.appointments) - 1}. Please try again.\n")
-                            continue
-                        confirm = input(f"  Are you sure you want to permanently delete appointment [{idx}]? (yes/no): ").strip().lower()
-                        if confirm not in ("yes", "y", "نعم", "موافق", "confirm", "تاكيد"):
-                            print("\n[INFO] Deletion cancelled. Appointment was not deleted.\n")
-                            break
-
-                        deleted = manager.delete_appointment(idx)
-                        manager.save_to_file("clinic_data.json", silent=True)
-                        time_disp = deleted.time.strftime('%Y-%m-%d %H:%M') if isinstance(deleted.time, datetime) else str(deleted.time)
-                        print(f"\n[SUCCESS] Appointment [{idx}] deleted successfully!")
-                        print(f"  Patient Record : {deleted.patient.display_profile()}")
-                        print(f"  Doctor Record  : {deleted.doctor.display_profile()}")
-                        print(f"  Freed Slot     : {time_disp}")
-                        if deleted.patient.priority_level() == 1:
-                            rem_emg = manager.fee_calculator.get_emergency_count() if hasattr(manager.fee_calculator, "get_emergency_count") else 0
-                            print(f"  Emergency Count: Decremented in triage closure (Active: {rem_emg})")
-                        print()
-                        break
-                    except (ValueError, ClinicError) as err:
-                        print(f"\n[ERROR] Deletion failed: {err}. Please try again.\n")
-
-            elif choice == "8":
-                manager.daily_report()
-
-            elif choice == "9":
-                manager.save_to_file("clinic_data.json")
-
-            elif choice == "10":
-                print_section_header("RESET CLINIC DATA")
-                if not current_user.has_permission("reset_database"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                print("  WARNING: This will permanently delete ALL registered patients,")
-                print("  doctors, and scheduled appointments from memory and 'clinic_data.json'.\n")
-                confirm = input("  Are you sure you want to reset all clinic data? (yes/no): ").strip().lower()
-                if confirm in ("yes", "y", "نعم", "موافق", "confirm", "تاكيد"):
-                    try:
-                        manager.reset_database("clinic_data.json")
-                        print(f"\n[SUCCESS] All clinic data has been reset successfully. Database is now clean.\n")
-                    except ClinicError as err:
-                        print(f"\n[ERROR] Reset failed: {err}\n")
-                else:
-                    print(f"\n[INFO] Data reset cancelled. Your existing clinic records are intact.\n")
-
-            elif choice == "11":
-                print("\n" + "-" * 54)
-                print(" Saving clinic database before exiting...")
-                manager.save_to_file("clinic_data.json", silent=True)
-                print("+" + "=" * 54 + "+")
-                print("|" + "Thank you for using Smart Clinic Queue System!".center(54) + "|")
-                print("|" + "Data saved successfully. Goodbye!".center(54) + "|")
-                print("+" + "=" * 54 + "+\n")
-                break
-
-            elif choice == "12":
-                print_section_header("EXPORT DAILY REPORT")
-                if not current_user.has_permission("export_report"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                export_path = input("  File path to export [Default: 'daily_report.txt'] [or 'cancel']: ").strip()
-                if export_path.lower() == "cancel":
-                    continue
-                target_path = export_path if export_path else "daily_report.txt"
-                try:
-                    manager.export_report_to_file(target_path)
-                except ClinicError as err:
-                    print(f"\n[ERROR] {err}\n")
-
-            elif choice == "13":
-                print_section_header("PATIENT HISTORY (Recursive & Memoized)")
-                if not current_user.has_permission("view_history"):
-                    print(f"\n[ERROR] Access denied. Your role '{current_user.display_role()}' does not permit this action.\n")
-                    continue
-
-                if not manager.patients:
-                    print("\n[INFO] No registered patients in system.\n")
-                    continue
-
-                p_id = input("  Patient ID     (e.g. patient-123) [or 'cancel' to exit]: ").strip()
-                if p_id.lower() == "cancel":
-                    continue
-                try:
-                    completed_visits, is_hit = manager.get_patient_completed_visits(p_id, return_status=True)
-                    patient = manager.patients[p_id]
-                    status_tag = "[CACHE HIT]" if is_hit else "[COMPUTED]"
-
-                    print(f"\n{status_tag} Completed visits for Patient {patient.name} ({patient.person_id}):")
-                    print("  " + "-" * 65)
-                    if not completed_visits:
-                        print("  No completed visits found for this patient.")
-                    else:
-                        for v_idx, v in enumerate(completed_visits, 1):
-                            v_time = v.time.strftime("%Y-%m-%d %H:%M") if isinstance(v.time, datetime) else str(v.time)
-                            print(f"  {v_idx}. Dr. {v.doctor.name:<16} ({v.doctor.specialty:<12}) | Time: {v_time} | Fee: ${v.fee:.2f}")
-                    print("  " + "-" * 65)
-                    print(f"  Total completed visits: {len(completed_visits)}\n")
-                except ClinicError as err:
-                    print(f"\n[ERROR] {err}\n")
-
-            else:
-                print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 13 (e.g. '1' or 'Register').\n")
-
+        if isinstance(current_user, StaffUser):
+            run_staff_menu(manager, current_user)
+        elif isinstance(current_user, DoctorUser):
+            run_doctor_menu(manager, current_user)
+        elif isinstance(current_user, PatientUser):
+            run_patient_menu(manager, current_user)
+        else:
+            print(f"\n[ERROR] Unknown user role '{type(current_user).__name__}'. Exiting.\n")
     except (KeyboardInterrupt, SystemExit):
         print("\n\n[INFO] Program interrupted. Auto-saving clinic database before exit...")
         manager.save_to_file("clinic_data.json", silent=True)
