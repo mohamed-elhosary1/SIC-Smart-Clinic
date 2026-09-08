@@ -2,29 +2,37 @@
     "patients": [
         {
             "type": "Regular",
-            "person_id": "patient-238",
-            "name": "Mohamed",
-            "phone": "01017513072",
-            "age": 19,
-            "case_type": "بموت"
+            "person_id": "patient-101",
+            "name": "John Doe",
+            "phone": "01122233344",
+            "age": 30,
+            "case_type": "Hypertension"
+        },
+        {
+            "type": "Emergency",
+            "person_id": "patient-901",
+            "name": "Jane Critical",
+            "phone": "01233344455",
+            "age": 25,
+            "case_type": "Critical"
         },
         {
             "type": "Regular",
-            "person_id": "patient-191",
-            "name": "Mohamed Elhosary",
-            "phone": "01017513072",
-            "age": 19,
-            "case_type": "Im dying"
-        },
-        {
-            "type": "Regular",
-            "person_id": "patient-318",
-            "name": "Mohamed Elhosary",
-            "phone": "01017513072",
-            "age": 19,
-            "case_type": "بموت"
+            "person_id": "patient-574",
+            "name": "Alice Smith",
+            "phone": "01099988877",
+            "age": 28,
+            "case_type": "Flu"
         }
     ],
-    "doctors": [],
+    "doctors": [
+        {
+            "person_id": "doctor-1",
+            "name": "Dr. House",
+            "phone": "01012345678",
+            "specialty": "Diagnostic",
+            "availability": true
+        }
+    ],
     "appointments": []
 }

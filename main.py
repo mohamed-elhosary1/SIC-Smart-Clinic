@@ -48,7 +48,7 @@ class InvalidFormatError(ClinicError):
 # =========================================================
 
 class User:
-    """كلاس أب لأي مستخدم في النظام (Staff/Doctor/Patient)"""
+    """كلاس أب لأي مستخدم إداري أو طبي في النظام (Staff / Doctor)"""
 
     def __init__(self, username: str, password: str, allowed_actions: set):
         self.username = username
@@ -95,21 +95,6 @@ class DoctorUser(User):
         return "Doctor"
 
 
-class PatientUser(User):
-    """المريض - يطّلع فقط على بياناته الخاصة (مواعيده، دوره في الطابور، وسجله الطبي)"""
-
-    PATIENT_ACTIONS = {
-        "view_own_data",
-    }
-
-    def __init__(self, username: str, password: str, patient_id: str):
-        super().__init__(username, password, allowed_actions=self.PATIENT_ACTIONS)
-        self.patient_id = patient_id
-
-    def display_role(self) -> str:
-        return "Patient"
-
-
 # قاعدة بيانات المستخدمين التجريبية الافتراضية للطاقم الطبي والإداري
 USERS_DB: dict[str, dict] = {
     "staff": {
@@ -123,88 +108,14 @@ USERS_DB: dict[str, dict] = {
 }
 
 
-def authenticate(username: str, password: str, manager) -> User:
-    """التحقق من بيانات الدخول (Staff / Doctor / Patient) وإرجاع كائن المستخدم المناسب"""
-    u_clean = username.strip()
-    u_key = u_clean.lower()
+def authenticate(username: str, password: str) -> User:
+    """التحقق من بيانات الطاقم فقط (Staff / Doctor) — مفيش مرضى هنا خالص"""
+    u_key = username.strip().lower()
     p_clean = password.strip()
-
-    # 1. فحص حسابات الطاقم الطبي والإداري (Staff / Doctor)
-    if u_key in USERS_DB:
-        user_record = USERS_DB[u_key]
-        if user_record["password"] == p_clean:
-            return user_record["factory"](u_clean, p_clean)
+    user_record = USERS_DB.get(u_key)
+    if not user_record or user_record["password"] != p_clean:
         raise ClinicError("Invalid credentials. Please check username and password.")
-
-    # 2. فحص حسابات المرضى المسجلين (ID المريض وكلمة المرور الخاصة به)
-    for p_id, patient in manager.patients.items():
-        if p_id.lower() == u_key:
-            if patient.password and patient.password == p_clean:
-                return PatientUser(username=patient.name, password=p_clean, patient_id=patient.person_id)
-            elif not patient.password:
-                raise ClinicError("This patient account does not have a password set. Please contact clinic staff.")
-            else:
-                raise ClinicError("Invalid credentials. Please check username and password.")
-
-    raise ClinicError("Invalid credentials. Please check username and password.")
-
-
-def login_screen(manager) -> User:
-    """شاشة البداية وتسجيل الدخول مع إتاحة التسجيل الذاتي للمرضى فقط"""
-    while True:
-        print("\n+" + "=" * 54 + "+")
-        print("|" + "SMART CLINIC SYSTEM".center(54) + "|")
-        print("|" + "Samsung Innovation Campus".center(54) + "|")
-        print("+" + "=" * 54 + "+")
-        print("|  [1] Login (Staff / Doctor / Patient)                |")
-        print("|  [2] Register New Patient                            |")
-        print("|  [3] Exit                                            |")
-        print("+" + "-" * 54 + "+")
-
-        raw_choice = input("\nEnter choice (1-3) [or enter username directly]: ").strip()
-        choice = raw_choice.lower()
-
-        if choice in ("1", "login", "log in", "دخول", "تسجيل دخول"):
-            while True:
-                try:
-                    username = input("\n  Username (or Patient ID) [or 'cancel']: ").strip()
-                    if username.lower() == "cancel":
-                        break
-                    if not username:
-                        print("\n[ERROR] Username cannot be empty. Please try again.")
-                        continue
-                    password = input("  Password: ").strip()
-                    user = authenticate(username, password, manager)
-                    print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
-                    return user
-                except ClinicError as err:
-                    print(f"\n[ERROR] {err} Try again.")
-
-        elif choice in ("2", "register", "reg", "patient", "تسجيل", "تسجيل مريض", "مريض جديد"):
-            registered_patient = action_register_patient(manager)
-            if registered_patient:
-                login_now = input("  Would you like to log in to Patient Portal now? (yes/no) [Default: yes]: ").strip().lower()
-                if login_now in ("", "y", "yes", "نعم", "موافق"):
-                    user = PatientUser(username=registered_patient.name, password=registered_patient.password, patient_id=registered_patient.person_id)
-                    print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
-                    return user
-
-        elif choice in ("3", "exit", "quit", "q", "خروج"):
-            print("\nExiting Smart Clinic Queue System. Goodbye!\n")
-            raise SystemExit
-
-        elif choice in USERS_DB or any(p_id.lower() == choice for p_id in manager.patients):
-            try:
-                password = input(f"  Password for '{raw_choice}': ").strip()
-                user = authenticate(raw_choice, password, manager)
-                print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
-                return user
-            except ClinicError as err:
-                print(f"\n[ERROR] {err} Try again.")
-
-        else:
-            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please select 1 (Login), 2 (Register New Patient), or 3 (Exit).\n")
-
+    return user_record["factory"](username.strip(), p_clean)
 
 
 # =========================================================
@@ -313,13 +224,12 @@ class Person:
 
 
 class Patient(Person):
-    def __init__(self, person_id: str, name: str, phone: str, age: int, case_type: str, password: str = ""):
+    def __init__(self, person_id: str, name: str, phone: str, age: int, case_type: str):
         if not validate_patient_id(person_id):
             raise InvalidFormatError(f"Invalid patient ID format: '{person_id}'. Expected 'patient-<number>'")
         super().__init__(person_id, name, phone)
         self.age = int(age)
         self.case_type = case_type.strip()
-        self.password = password.strip()
         self.visit_history: list = []
 
     def display_profile(self) -> str:
@@ -477,7 +387,7 @@ class ClinicManager:
         self.current_user: User | None = None
         self._visit_lookup_cache: dict[str, list] = {}
 
-    def set_current_user(self, user: User):
+    def set_current_user(self, user: User | None):
         """تعيين المستخدم الحالي للتحقق من صلاحياته في العمليات الحساسة"""
         self.current_user = user
 
@@ -774,7 +684,7 @@ class ClinicManager:
 
     def get_patient_completed_visits(self, patient_id: str, return_status: bool = False):
         """استرجاع الزيارات المكتملة للمريض عبر دالة العودية مع التخزين المؤقت (Memoization)"""
-        if self.current_user is not None and not self.current_user.has_permission("view_history") and not self.current_user.has_permission("view_own_data"):
+        if self.current_user is not None and not self.current_user.has_permission("view_history"):
             raise ClinicError("Access denied. Your role does not permit this action.")
 
         if patient_id not in self.patients:
@@ -812,8 +722,7 @@ class ClinicManager:
                         "name": p.name,
                         "phone": p.phone,
                         "age": p.age,
-                        "case_type": p.case_type,
-                        "password": getattr(p, "password", "")
+                        "case_type": p.case_type
                     }
                     for p in self.patients.values()
                 ],
@@ -895,15 +804,13 @@ class ClinicManager:
         for p_data in data.get("patients", []):
             try:
                 p_type = p_data.get("type", "Regular")
-                p_pass = p_data.get("password", "")
                 if p_type == "Emergency":
                     patient = EmergencyPatient(
                         person_id=p_data["person_id"],
                         name=p_data["name"],
                         phone=p_data["phone"],
                         age=p_data["age"],
-                        case_type=p_data["case_type"],
-                        password=p_pass
+                        case_type=p_data["case_type"]
                     )
                 else:
                     patient = RegularPatient(
@@ -911,8 +818,7 @@ class ClinicManager:
                         name=p_data["name"],
                         phone=p_data["phone"],
                         age=p_data["age"],
-                        case_type=p_data["case_type"],
-                        password=p_pass
+                        case_type=p_data["case_type"]
                     )
                 self.patients[patient.person_id] = patient
             except Exception as e:
@@ -1005,7 +911,7 @@ def print_section_header(title: str, width: int = 54):
 
 
 def action_register_patient(manager: ClinicManager):
-    """تسجيل مريض جديد (عادي أو طوارئ) وتحديد كلمة المرور لحسابه وحفظه فورياً"""
+    """تسجيل مريض جديد بواسطة موظف العيادة وتوليد ID وحفظه فورياً"""
     print_section_header("REGISTER PATIENT")
     if manager.current_user is not None and not manager.current_user.has_permission("register_patient"):
         print(f"\n[ERROR] Access denied. Your role '{manager.current_user.display_role()}' does not permit this action.\n")
@@ -1053,24 +959,15 @@ def action_register_patient(manager: ClinicManager):
         except ValueError:
             print(f"\n[ERROR] Age must be a valid positive integer between 1 and 130. Got '{age_input}'. Please try again.\n")
 
-    # كلمة المرور لحساب المريض للولوج إلى Patient Portal
-    while True:
-        password = input("  Account Pass   (Patient Portal password) [or 'cancel']: ").strip()
-        if password.lower() == "cancel":
-            return None
-        if password:
-            break
-        print("\n[ERROR] Password cannot be empty. Please try again.\n")
-
     case_type = input("  Diagnosis/Case [or 'cancel']: ").strip()
     if case_type.lower() == "cancel":
         return None
 
     try:
         if p_type == "2":
-            new_p = EmergencyPatient(p_id, name, phone, age, case_type, password=password)
+            new_p = EmergencyPatient(p_id, name, phone, age, case_type)
         else:
-            new_p = RegularPatient(p_id, name, phone, age, case_type, password=password)
+            new_p = RegularPatient(p_id, name, phone, age, case_type)
         manager.register_patient(new_p)
         # حفظ فوري تلقائي
         manager.save_to_file("clinic_data.json", silent=True)
@@ -1088,7 +985,6 @@ def action_register_patient(manager: ClinicManager):
         print(f"|  Patient Type  : {p_type_label:<35} |")
         print(f"|  Phone Number  : {new_p.phone:<35} |")
         print(f"|  Age           : {str(new_p.age):<35} |")
-        print(f"|  Account Pass  : {password:<35} |")
         print(f"|  Diagnosis     : {(new_p.case_type or 'General Checkup'):<35} |")
         print("+" + "-" * 54 + "+\n")
         return new_p
@@ -1562,7 +1458,7 @@ def action_view_own_history(manager: ClinicManager, patient_id: str):
 
 
 # =========================================================
-# ROLE-SPECIFIC MENUS
+# MENUS & PORTALS
 # =========================================================
 
 def run_staff_menu(manager: ClinicManager, current_user: StaffUser):
@@ -1584,7 +1480,7 @@ def run_staff_menu(manager: ClinicManager, current_user: StaffUser):
         print("|  [10] Reset Clinic Data   : Clear all saved records  |")
         print("|  [11] Export Report       : Save report to .txt file |")
         print("|  [12] Patient History     : Completed visits (memo)  |")
-        print("|  [13] Quit (Auto-Save)    : Save data and exit       |")
+        print("|  [13] Logout / Return     : Back to main screen      |")
         print("+" + "-" * 54 + "+")
 
         raw_choice = input("\nEnter choice (1-13): ").strip()
@@ -1616,11 +1512,10 @@ def run_staff_menu(manager: ClinicManager, current_user: StaffUser):
             action_patient_history(manager)
         elif choice == "13":
             print("\n" + "-" * 54)
-            print(" Saving clinic database before exiting...")
+            print(" Saving clinic database before returning to main screen...")
             manager.save_to_file("clinic_data.json", silent=True)
             print("+" + "=" * 54 + "+")
-            print("|" + "Thank you for using Smart Clinic Queue System!".center(54) + "|")
-            print("|" + "Data saved successfully. Goodbye!".center(54) + "|")
+            print("|" + "Logged out successfully!".center(54) + "|")
             print("+" + "=" * 54 + "+\n")
             break
         else:
@@ -1638,7 +1533,7 @@ def run_doctor_menu(manager: ClinicManager, current_user: DoctorUser):
         print("|  [2] Update Visit Status  : Manage appointment state |")
         print("|  [3] Daily Report         : View clinic statistics   |")
         print("|  [4] Patient History     : Completed visits (memo)  |")
-        print("|  [5] Quit (Auto-Save)    : Save data and exit       |")
+        print("|  [5] Logout / Return     : Back to main screen      |")
         print("+" + "-" * 54 + "+")
 
         raw_choice = input("\nEnter choice (1-5): ").strip().lower()
@@ -1651,54 +1546,115 @@ def run_doctor_menu(manager: ClinicManager, current_user: DoctorUser):
             action_daily_report(manager)
         elif raw_choice in ("4", "history", "patient history", "completed visits", "سجل"):
             action_patient_history(manager)
-        elif raw_choice in ("5", "quit", "exit", "q", "خروج"):
+        elif raw_choice in ("5", "quit", "exit", "logout", "q", "خروج"):
             print("\n" + "-" * 54)
-            print(" Saving clinic database before exiting...")
+            print(" Saving clinic database before returning to main screen...")
             manager.save_to_file("clinic_data.json", silent=True)
             print("+" + "=" * 54 + "+")
-            print("|" + "Thank you for using Smart Clinic Queue System!".center(54) + "|")
-            print("|" + "Data saved successfully. Goodbye!".center(54) + "|")
+            print("|" + "Logged out successfully!".center(54) + "|")
             print("+" + "=" * 54 + "+\n")
             break
         else:
             print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 5.\n")
 
 
-def run_patient_menu(manager: ClinicManager, current_user: PatientUser):
-    """منيو بوابة المريض (Patient Portal) - مقيد تماماً ببيانات المريض الحالي فقط"""
-    p_id = current_user.patient_id
-    p_name = current_user.username
+def run_patient_portal(manager: ClinicManager, patient_id: str):
+    """بوابة استعلام المريض - عرض فقط دون أي إمكانية للتعديل أو الحاجة لكلمة مرور"""
+    patient = manager.patients[patient_id]
 
     while True:
-        portal_title = f"PATIENT PORTAL - {p_name}"
+        portal_title = f"PATIENT LOOKUP - {patient.name}"
         print("\n+" + "=" * 54 + "+")
         print("|" + portal_title.center(54) + "|")
         print("+" + "=" * 54 + "+")
         print("|  [1] My Appointments     : View scheduled visits     |")
         print("|  [2] My Queue Position   : Check current wait status |")
         print("|  [3] My Visit History    : Completed medical visits  |")
-        print("|  [4] Logout / Quit       : Exit portal safely        |")
+        print("|  [4] Back to Main Screen                              |")
         print("+" + "-" * 54 + "+")
 
         raw_choice = input("\nEnter choice (1-4): ").strip().lower()
 
         if raw_choice in ("1", "appointments", "my appointments", "مواعيدي"):
-            action_view_own_appointments(manager, p_id)
+            action_view_own_appointments(manager, patient_id)
         elif raw_choice in ("2", "queue", "my queue", "position", "دوري"):
-            action_view_own_queue_position(manager, p_id)
+            action_view_own_queue_position(manager, patient_id)
         elif raw_choice in ("3", "history", "my history", "visits", "سجلي"):
-            action_view_own_history(manager, p_id)
-        elif raw_choice in ("4", "logout", "quit", "exit", "q", "خروج"):
-            print("\n" + "-" * 54)
-            print(" Saving clinic database before exiting...")
-            manager.save_to_file("clinic_data.json", silent=True)
-            print("+" + "=" * 54 + "+")
-            print("|" + f"Goodbye, {p_name}!".center(54) + "|")
-            print("|" + "Wishing you great health!".center(54) + "|")
-            print("+" + "=" * 54 + "+\n")
-            break
+            action_view_own_history(manager, patient_id)
+        elif raw_choice in ("4", "back", "return", "رجوع", "خروج"):
+            print(f"\nGoodbye, {patient.name}!\n")
+            return
         else:
             print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please choose from 1 to 4.\n")
+
+
+def patient_lookup(manager: ClinicManager) -> None:
+    """استعلام المريض برقم الـ ID فقط - بدون أي تسجيل دخول أو كلمة مرور"""
+    print("\n+" + "=" * 54 + "+")
+    print("|" + "PATIENT LOOKUP".center(54) + "|")
+    print("+" + "-" * 54 + "+")
+
+    while True:
+        p_id = input("\n  Enter your Patient ID (e.g. patient-123) [or 'cancel']: ").strip()
+        if p_id.lower() == "cancel":
+            return
+
+        if p_id not in manager.patients:
+            print(f"\n[ERROR] Patient ID '{p_id}' not found. Please check your ID and try again.\n")
+            continue
+
+        # معرف المريض مسجل وصحيح، الدخول المباشر لبوابة الاستعلام
+        run_patient_portal(manager, p_id)
+        return
+
+
+def login_screen(manager: ClinicManager) -> User | None:
+    """شاشة تسجيل دخول الطاقم الطبي والإداري فقط (Staff / Doctor)"""
+    print("\n+" + "=" * 54 + "+")
+    print("|" + "STAFF / DOCTOR LOGIN".center(54) + "|")
+    print("+" + "-" * 54 + "+")
+
+    while True:
+        try:
+            username = input("\n  Username [or 'cancel' to go back]: ").strip()
+            if username.lower() == "cancel":
+                return None
+            if not username:
+                print("\n[ERROR] Username cannot be empty. Please try again.")
+                continue
+            password = input("  Password: ").strip()
+            user = authenticate(username, password)
+            print(f"\n[SUCCESS] Welcome, {user.display_role()} ({user.username})!\n")
+            return user
+        except ClinicError as err:
+            print(f"\n[ERROR] {err} Try again.")
+
+
+def opening_screen(manager: ClinicManager) -> User | None:
+    """الشاشة الرئيسية: تسجيل دخول الطاقم أو استعلام مريض أو الخروج من النظام"""
+    while True:
+        print("\n+" + "=" * 54 + "+")
+        print("|" + "SMART CLINIC SYSTEM".center(54) + "|")
+        print("|" + "Samsung Innovation Campus".center(54) + "|")
+        print("+" + "=" * 54 + "+")
+        print("|  [1] Staff / Doctor Login                             |")
+        print("|  [2] Patient Lookup (Enter your Patient ID)           |")
+        print("|  [3] Exit                                             |")
+        print("+" + "-" * 54 + "+")
+
+        raw_choice = input("\nEnter choice (1-3): ").strip()
+
+        if raw_choice in ("1", "login", "staff", "doctor"):
+            user = login_screen(manager)
+            if user is not None:
+                return user
+        elif raw_choice in ("2", "lookup", "patient", "استعلام"):
+            patient_lookup(manager)
+        elif raw_choice in ("3", "exit", "quit", "q", "خروج"):
+            print("\nExiting Smart Clinic Queue System. Goodbye!\n")
+            raise SystemExit
+        else:
+            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please select 1, 2, or 3.\n")
 
 
 # =========================================================
@@ -1708,23 +1664,24 @@ def run_patient_menu(manager: ClinicManager, current_user: PatientUser):
 def main():
     manager = ClinicManager(base_fee=100.0)
 
-    # 1. تحميل البيانات التلقائي عند بدء التشغيل لضمان استرجاع كافة الحسابات
+    # 1. تحميل البيانات التلقائي عند بدء التشغيل
     manager.load_from_file("clinic_data.json")
 
-    # 2. شاشة تسجيل الدخول الإلزامية
-    current_user = login_screen(manager)
-    manager.set_current_user(current_user)
-
-    # 3. توجيه المستخدم للمنيو المخصصة لدوره
+    # 2. حلقة الشاشة الرئيسية المستمرة
     try:
-        if isinstance(current_user, StaffUser):
-            run_staff_menu(manager, current_user)
-        elif isinstance(current_user, DoctorUser):
-            run_doctor_menu(manager, current_user)
-        elif isinstance(current_user, PatientUser):
-            run_patient_menu(manager, current_user)
-        else:
-            print(f"\n[ERROR] Unknown user role '{type(current_user).__name__}'. Exiting.\n")
+        while True:
+            current_user = opening_screen(manager)
+            if current_user is None:
+                continue
+
+            manager.set_current_user(current_user)
+
+            if isinstance(current_user, StaffUser):
+                run_staff_menu(manager, current_user)
+            elif isinstance(current_user, DoctorUser):
+                run_doctor_menu(manager, current_user)
+            
+            manager.set_current_user(None)
     except (KeyboardInterrupt, SystemExit):
         print("\n\n[INFO] Program interrupted. Auto-saving clinic database before exit...")
         manager.save_to_file("clinic_data.json", silent=True)
