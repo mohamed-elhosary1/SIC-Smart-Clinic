@@ -9,9 +9,10 @@ from datetime import datetime
 #----------------------------------------------
 
 
-# =========================================================
+#----------------------------------------------
 # EXCEPTIONS (استثناءات النظام)
-# =========================================================
+#----------------------------------------------
+
 
 class ClinicError(Exception):
     """الأساس لكل أخطاء العيادة"""
@@ -39,39 +40,41 @@ class DoctorNotFoundError(ClinicError):
 
 
 class InvalidFormatError(ClinicError):
-    """فشل التحقق من صيغة الـ ID أو رقم الهاتف"""
+    """فشل التحقق من صيغة ID أو رقم الهاتف"""
     pass
 
 
-# =========================================================
+#----------------------------------------------
 # AUTHENTICATION & ROLE-BASED ACCESS CONTROL (نظام الصلاحيات)
-# =========================================================
+#----------------------------------------------
+
+
 
 class User:
     """كلاس أب لأي مستخدم إداري أو طبي في النظام (Staff / Doctor)"""
 
     def __init__(self, username: str, password: str, allowed_actions: set):
         self.username = username
-        self.password = password  # ملحوظة: للتبسيط فقط - في الأنظمة الحقيقية يتم استخدام hashing
+        self.password = password  
         self.allowed_actions = allowed_actions
 
     def has_permission(self, action: str) -> bool:
-        """فحص الصلاحية الافتراضية بناءً على مجموعة الأكشنز المسموحة"""
+        """فحص الصلاحية الافتراضية"""
         return action in self.allowed_actions
 
     def display_role(self) -> str:
-        """عرض اسم الدور الوظيفي للمستخدم"""
+        """عرض اسم الدور"""
         return "Generic User"
 
 
 class StaffUser(User):
-    """موظف العيادة - يمتلك كافة الصلاحيات الإدارية والتشغيلية في النظام دون قيود"""
+    """موظف العيادة - الصلاحيات الإدارية"""
 
     def __init__(self, username: str, password: str):
         super().__init__(username, password, allowed_actions=set())
 
     def has_permission(self, action: str) -> bool:
-        # موظف العيادة مسموح له بكافة العمليات دائمًا
+        # موظف العيادة مسموح له بكل العمليات 
         return True
 
     def display_role(self) -> str:
@@ -79,7 +82,7 @@ class StaffUser(User):
 
 
 class DoctorUser(User):
-    """الطبيب - يعاين طابور الانتظار ويحدث حالة الكشف ويطلع على تاريخ المريض والتقرير اليومي"""
+    """الطبيب  يعاين طابور الانتظار ويحدث حالة الكشف ويطلع على تاريخ المريض والتقرير اليومي"""
 
     DOCTOR_ACTIONS = {
         "view_queue",
@@ -95,7 +98,8 @@ class DoctorUser(User):
         return "Doctor"
 
 
-# قاعدة بيانات المستخدمين التجريبية الافتراضية للطاقم الطبي والإداري
+#  بيانات المستخدمين التجريبية الافتراضية 
+# ستاف ودكاترة
 USERS_DB: dict[str, dict] = {
     "staff": {
         "password": "staff123",
@@ -109,7 +113,7 @@ USERS_DB: dict[str, dict] = {
 
 
 def authenticate(username: str, password: str) -> User:
-    """التحقق من بيانات الطاقم فقط (Staff / Doctor) — مفيش مرضى هنا خالص"""
+    """التحقق من بيانات الطاقم فقط (Staff / Doctor) — مفيش مرضى هنا """
     u_key = username.strip().lower()
     p_clean = password.strip()
     user_record = USERS_DB.get(u_key)
@@ -118,13 +122,13 @@ def authenticate(username: str, password: str) -> User:
     return user_record["factory"](username.strip(), p_clean)
 
 
-# =========================================================
+# #----------------------------------------------
 # REGEX VALIDATORS (التحقق بالـ Regex)
-# =========================================================
+# #----------------------------------------------
 
 PATIENT_ID_PATTERN = re.compile(r"patient-[0-9]+")   # صيغة ID المريض: patient-123
 DOCTOR_ID_PATTERN = re.compile(r"doctor-[0-9]+")    # صيغة ID الدكتور: doctor-123
-PHONE_PATTERN = re.compile(r"01[0-9]{9}")        # 11 رقم بيبدأ بـ 01
+PHONE_PATTERN = re.compile(r"01[0-9]{9}")        # 11 رقم بيبدأ ب 01
 
 
 def validate_patient_id(patient_id: str) -> bool:
@@ -138,13 +142,13 @@ def validate_doctor_id(doctor_id: str) -> bool:
 
 
 def validate_phone(phone: str) -> bool:
-    """فحص صحة رقم الموبايل المصري"""
+    """فحص صحة رقم لمصري"""
     return bool(PHONE_PATTERN.fullmatch(phone.strip()))
 
 
-# =========================================================
+# #----------------------------------------------
 # FLEXIBLE INPUT HELPERS (مرونة الإدخال)
-# =========================================================
+# #----------------------------------------------
 
 def parse_patient_type(val: str) -> str:
     """قبول 1 أو Regular أو عادي أو أي اختصار"""
@@ -202,10 +206,9 @@ def parse_menu_choice(val: str) -> str:
     return v
 
 
-# =========================================================
+# #----------------------------------------------
 # OOP DATA MODELS
-# =========================================================
-
+# #----------------------------------------------
 class Person:
     def __init__(self, person_id: str, name: str, phone: str):
         # تفعيل فحص رقم التلفون ورفع InvalidFormatError لو غلط
@@ -250,7 +253,7 @@ class EmergencyPatient(Patient):
         return 1
 
     def display_profile(self) -> str:
-        # تمييز مريض الطوارئ بوضوح
+        # تمييز مريض الطوارئ 
         return f"{super().display_profile()} | Priority: Emergency (High)"
 
 
@@ -291,7 +294,7 @@ class Appointment:
         self.fee = float(fee)
 
     def update_status(self, new_status: str):
-        """تحديث حالة الكشف بنص عادي بعد الفحص المرن"""
+        """تحديث حالة الكشف بنص عادي بعد الفحص """
         norm_status = parse_status(new_status)
         if not norm_status:
             raise ValueError(f"Invalid status '{new_status}'. Allowed: pending, completed, cancelled, in_progress")
@@ -302,12 +305,11 @@ class Appointment:
         return f"Patient: {self.patient.person_id} | Dr. {self.doctor.name} | Time: {time_str} | Status: {self.status.upper()} | Fee: ${self.fee:.2f}"
 
 
-# =========================================================
+# #----------------------------------------------
 # ITERATOR, CLOSURE & RECURSION
-# =========================================================
-
+# #----------------------------------------------
 class WaitingQueueIterator:
-    """كاستم إيتريتور للمرور على طابور الانتظار عنصر عنصر"""
+    """ إيتريتور للمرور على طابور الانتظار عنصر عنصر"""
 
     def __init__(self, appointments: list):
         self._appointments = appointments
@@ -333,6 +335,7 @@ def make_triage_calculator(base_fee: float = 100.0, initial_emergency_count: int
         if patient.priority_level() == 1:
             emergency_count += 1
             return float(base_fee * 1.5)  # زيادة 50% لحالات الطوارئ
+            # النصب والاحتيال بابهى صورة
         return float(base_fee)
 
     def get_emergency_count() -> int:
@@ -355,12 +358,12 @@ def make_triage_calculator(base_fee: float = 100.0, initial_emergency_count: int
 
 
 def find_visits_recursive(visits: list, index: int = 0) -> list:
-    """دالة عودية (Recursive) للمرور على سجل الزيارات واستخراج المكتملة فقط بدون استخدام loops"""
+    """ ركيرجن  (Recursive) للمرور على سجل الزيارات واستخراج المكتملة فقط بدون استخدام loops"""
     # Base Case: لو وصلنا لنهاية قائمة الزيارات
     if index >= len(visits):
         return []
 
-    # Recursive Step: فحص الزيارة الحالية واستدعاء الدالة على باقي العناصر
+    # Recursive Step: فحص الزيارة الحالية واستدعاء الفانكشن على باقي العناصر
     current_visit = visits[index]
     remaining_visits = find_visits_recursive(visits, index + 1)
 
@@ -369,9 +372,11 @@ def find_visits_recursive(visits: list, index: int = 0) -> list:
     return remaining_visits
 
 
-# =========================================================
+# #----------------------------------------------
+
 # CLINIC MANAGER (MAIN ORCHESTRATOR)
-# =========================================================
+# #----------------------------------------------
+
 
 class ClinicManager:
     """إدارة العيادة بالكامل: المرضى، الدكاترة، المواعيد، التصدير، الكاش، والصلاحيات"""
@@ -391,7 +396,7 @@ class ClinicManager:
         """تعيين المستخدم الحالي للتحقق من صلاحياته في العمليات الحساسة"""
         self.current_user = user
 
-    # ---------- ID Generation (randint من 1 لـ 1000) ----------
+    # ---------- ID Generation  ----------
 
     def generate_unique_patient_id(self) -> str:
         """توليد ID مريض تلقائي عشوائي من 1 لـ 1000 والتأكد إنه مش متكرر"""
@@ -422,7 +427,7 @@ class ClinicManager:
         return patient
 
     def add_doctor(self, doctor: Doctor):
-        """إضافة دكتور جديد للعيادة مع فحص الصلاحية"""
+        """إضافة دكتور جديد للعيادة مع  """
         if self.current_user is not None and not self.current_user.has_permission("add_doctor"):
             raise ClinicError("Access denied. Your role does not permit this action.")
 
@@ -434,7 +439,7 @@ class ClinicManager:
         return doctor
 
     def toggle_doctor_availability(self, doctor_id: str) -> bool:
-        """تبديل حالة توفر الطبيب (متاح / غير متاح) مع فحص الصلاحية"""
+        """تبديل حالة توفر الطبيب (متاح / غير متاح)  """
         if self.current_user is not None and not self.current_user.has_permission("toggle_doctor_availability"):
             raise ClinicError("Access denied. Your role does not permit this action.")
 
@@ -447,7 +452,7 @@ class ClinicManager:
     # ---------- Appointments ----------
 
     def book_appointment(self, patient_id: str, doctor_id: str, time):
-        """حجز موعد جديد مع منع التكرار والتحقق من التوفر وفحص الصلاحية"""
+        """حجز موعد جديد مع منع التكرار والتحقق من التوفر """
         if self.current_user is not None and not self.current_user.has_permission("book_appointment"):
             raise ClinicError("Access denied. Your role does not permit this action.")
 
@@ -474,7 +479,7 @@ class ClinicManager:
         if not target_doctor.availability:
             raise ClinicError(f"Dr. {target_doctor.name} is currently marked as unavailable")
 
-        # فحص تكرار موعد الدكتور في booked_date الخاص بالـ instance
+        # فحص تكرار موعد الدكتور في booked_date الخاص  
         if doctor_id not in self.booked_date:
             self.booked_date[doctor_id] = []
         if time in self.booked_date[doctor_id]:
@@ -515,7 +520,6 @@ class ClinicManager:
         old_status = appt.status
         doc_id = appt.doctor.person_id
 
-        # التحقق عند إعادة تفعيل موعد كان ملغي لمنع التعارض إذا تم حجز الموعد لمريض آخر أثناء فترة الإلغاء
         if old_status == "cancelled" and norm_status != "cancelled":
             if doc_id in self.booked_date and appt.time in self.booked_date[doc_id]:
                 raise DuplicateBookingError(
@@ -531,7 +535,6 @@ class ClinicManager:
 
         appt.update_status(norm_status)
 
-        # إفراغ الكاش الخاص بالمريض لتحديث سجل زياراته (Cache Invalidation)
         self._visit_lookup_cache.pop(appt.patient.person_id, None)
 
         return appt
@@ -560,7 +563,6 @@ class ClinicManager:
             if hasattr(self.fee_calculator, "decrement_emergency_count"):
                 self.fee_calculator.decrement_emergency_count()
 
-        # إفراغ الكاش الخاص بالمريض لتحديث سجله (Cache Invalidation)
         self._visit_lookup_cache.pop(appt.patient.person_id, None)
 
         return appt
@@ -568,30 +570,28 @@ class ClinicManager:
     # ---------- Queue / Reports (functional tools) ----------
 
     def get_emergency_patients(self) -> list[Patient]:
-        """فلترة مرضى الطوارئ بـ filter + lambda"""
+        """فلترة مرضى الطوارئ  filter + lambda"""
         emergency = filter(lambda p: p.priority_level() == 1, self.patients.values())
         return list(emergency)
 
     def sort_queue_by_priority(self) -> list[Appointment]:
-        """ترتيب المواعيد بـ sorted + lambda (الطوارئ أولاً)"""
+        """ترتيب المواعيد بـ sorted + lambda (الطوارئ الاول)"""
         waiting = [appt for appt in self.appointments if appt.status == "pending"]
         waiting.sort(key=lambda appt: (appt.patient.priority_level(), appt.time))
         return waiting
 
     def get_waiting_queue_iterator(self) -> WaitingQueueIterator:
-        """إرجاع كاستم إيتريتور للمرور على الطابور"""
         waiting = self.sort_queue_by_priority()
         return WaitingQueueIterator(waiting)
 
     def calculate_total_revenue(self) -> float:
-        """حساب إجمالي الأرباح من المواعيد المكتملة فقط بـ reduce"""
+        """حساب إجمالي الأرباح من المواعيد المكتملة فقط  reduce"""
         completed_fees = [appt.fee for appt in self.appointments if appt.status == "completed"]
         return float(reduce(lambda total, fee: total + fee, completed_fees, 0.0))
 
-    # ---------- Shared DRY Report Helpers (Feature 1) ----------
+    # ---------- Shared د Report   ----------
 
     def _compute_report_metrics(self) -> dict:
-        """حساب إحصائيات التقرير وتجميعها في قاموس موحد منعاً للتكرار (DRY)"""
         emergency_count = len(self.get_emergency_patients())
         closure_count = self.fee_calculator.get_emergency_count() if hasattr(self.fee_calculator, "get_emergency_count") else 0
         completed = len([a for a in self.appointments if a.status == "completed"])
@@ -658,7 +658,6 @@ class ClinicManager:
         return report
 
     def export_report_to_file(self, path: str = "daily_report.txt") -> bool:
-        """تصدير التقرير اليومي إلى ملف نصي بنفس التنسيق مع timestamp ومعالجة الأخطاء بـ try/except"""
         if self.current_user is not None and not self.current_user.has_permission("export_report"):
             raise ClinicError("Access denied. Your role does not permit this action.")
 
@@ -690,12 +689,12 @@ class ClinicManager:
         if patient_id not in self.patients:
             raise PatientNotFoundError(f"Patient ID '{patient_id}' not found")
 
-        # فحص إذا كانت النتيجة مخزنة مسبقاً في الـ Cache
+        # فحص إذا كانت النتيجة مخزنة  في الـ Cache
         if patient_id in self._visit_lookup_cache:
             completed_visits = self._visit_lookup_cache[patient_id]
             is_cache_hit = True
         else:
-            # استدعاء الدالة العودية وحفظ النتيجة في الكاش
+            # استدعاء ريكرجم  وحفظ النتيجة
             patient = self.patients[patient_id]
             completed_visits = find_visits_recursive(patient.visit_history, 0)
             self._visit_lookup_cache[patient_id] = completed_visits
@@ -1603,7 +1602,6 @@ def patient_lookup(manager: ClinicManager) -> None:
             print(f"\n[ERROR] Patient ID '{p_id}' not found. Please check your ID and try again.\n")
             continue
 
-        # معرف المريض مسجل وصحيح، الدخول المباشر لبوابة الاستعلام
         run_patient_portal(manager, p_id)
         return
 
@@ -1657,17 +1655,17 @@ def opening_screen(manager: ClinicManager) -> User | None:
             print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please select 1, 2, or 3.\n")
 
 
-# =========================================================
-# MAIN ENTRY POINT
-# =========================================================
+# MAIN ENTRY POINT 
+#  main بتحسسني ان الدنيا لسه بخير
+
 
 def main():
     manager = ClinicManager(base_fee=100.0)
 
-    # 1. تحميل البيانات التلقائي عند بدء التشغيل
+    # 1. تحميل البيانات  عند بدء التشغيل
     manager.load_from_file("clinic_data.json")
 
-    # 2. حلقة الشاشة الرئيسية المستمرة
+    # 2. لوب الشاشة الرئيسية 
     try:
         while True:
             current_user = opening_screen(manager)
@@ -1682,6 +1680,10 @@ def main():
                 run_doctor_menu(manager, current_user)
             
             manager.set_current_user(None)
+            r"""
+            مش بتظبط دابما في الكيبورد انتربت فمش هشرحها عشان هتفضحنا لو حد منكم عايز يمسحها هي مش مهمة اوي
+            
+            """
     except (KeyboardInterrupt, SystemExit):
         print("\n\n[INFO] Program interrupted. Auto-saving clinic database before exit...")
         manager.save_to_file("clinic_data.json", silent=True)
