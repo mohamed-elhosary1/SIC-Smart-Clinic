@@ -6,7 +6,7 @@ An enterprise-grade, single-file clinic queue management system featuring intell
 
 ---
 
-## 📁 System Architecture
+## System Architecture
 
 The project adheres strictly to a clean single-file runtime architecture:
 * **[`main.py`](main.py)**: Contains the entire system implementation, including custom exception hierarchies, OOP domain models, regex validators, advanced functional tools (closures, custom iterators, recursion, memoization), role-based access control (RBAC), and interactive command-line interfaces.
@@ -16,7 +16,7 @@ The project adheres strictly to a clean single-file runtime architecture:
 
 ---
 
-## 🔐 Opening Screen & Role-Based Access Control (RBAC)
+## Opening Screen & Role-Based Access Control (RBAC)
 
 When launched, the system presents an intuitive, separated opening screen:
 
@@ -41,7 +41,7 @@ When launched, the system presents an intuitive, separated opening screen:
 
 ---
 
-## ⏱️ 30-Minute Appointment Slot Scheduling & Conflict Prevention
+## 30-Minute Appointment Slot Scheduling & Conflict Prevention
 
 The system enforces an intelligent **30-minute busy duration window** for all appointments:
 
@@ -53,7 +53,7 @@ The system enforces an intelligent **30-minute busy duration window** for all ap
 
 ---
 
-## 📋 Role-Specific Menus
+## Role-Specific Menus
 
 ### 1. Staff Main Menu (13 Options)
 - `[1] Register Patient`: Register new regular or emergency patient (auto-generates unique `patient-<num>`).
@@ -85,7 +85,7 @@ The system enforces an intelligent **30-minute busy duration window** for all ap
 
 ---
 
-## 🏛️ Class Hierarchy Summary
+## Class Hierarchy Summary
 
 | Class | Type | Description |
 |---|---|---|
@@ -103,7 +103,7 @@ The system enforces an intelligent **30-minute busy duration window** for all ap
 
 ---
 
-## 💡 Python Core Concepts Table
+## Python Core Concepts Table
 
 | Concept | Implementation in Code | Engineering Purpose & Value |
 |---|---|---|
@@ -122,7 +122,7 @@ The system enforces an intelligent **30-minute busy duration window** for all ap
 
 ---
 
-## 📑 Direct Code Navigation Index (فهرس الكود المباشر)
+## Direct Code Navigation Index
 
 Click on any link below to jump directly to its exact line of implementation in [`main.py`](https://github.com/mohamed-elhosary1/SIC-Smart-Clinic/blob/main/main.py):
 
