@@ -1,16 +1,28 @@
 {
   "version": 2,
   "name": "sic-clinic",
-  "framework": null,
-  "buildCommand": "pip install -r requirements.txt && reflex export --frontend-only --no-zip",
-  "outputDirectory": ".web/_static",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "routes": [
     {
       "handle": "filesystem"
     },
     {
-      "src": "/.*",
-      "dest": "/index.html"
+      "src": "/staff",
+      "dest": "/staff.html"
+    },
+    {
+      "src": "/doctor",
+      "dest": "/doctor.html"
+    },
+    {
+      "src": "/patient",
+      "dest": "/patient.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/"
     }
   ]
 }
