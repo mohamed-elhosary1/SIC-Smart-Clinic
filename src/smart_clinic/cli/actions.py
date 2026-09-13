@@ -571,7 +571,30 @@ def action_view_own_history(manager: ClinicManager, patient_id: str):
         print(f"\n[ERROR] {err}\n")
 
 
-# =========================================================
-# MENUS & APPLICATION FLOW
-# =========================================================
-
+def action_cloud_sync(manager: ClinicManager):
+    """Trigger manual cloud sync & recovery diagnostics."""
+    print_section_header("CLOUD DATA RECOVERY & SYNCHRONIZATION")
+    status = manager.cloud_sync.get_status()
+    print(f"Provider:    {status['provider']}")
+    print(f"Status:      {status['status'].upper()}")
+    print(f"Last Synced: {status['last_synced']}")
+    print("-" * 54)
+    print("Options:")
+    print("  [1] Push Database to Cloud Now")
+    print("  [2] Recover / Pull Database from Cloud")
+    print("  [3] Back to Menu")
+    opt = input("\nEnter choice (1-3): ").strip()
+    if opt == "1":
+        res = manager.sync_cloud()
+        if res.get("success"):
+            print("\n[SUCCESS] Clinic database successfully pushed to Cloud storage!\n")
+        else:
+            print("\n[WARNING] Could not push to cloud. Running in local fallback mode.\n")
+    elif opt == "2":
+        confirm = input("This will overwrite local database with cloud copy. Proceed? (y/n): ").strip().lower()
+        if confirm in ("y", "yes"):
+            recovered = manager.recover_from_cloud()
+            if recovered:
+                print("\n[SUCCESS] Local database successfully recovered from Cloud!\n")
+            else:
+                print("\n[INFO] Cloud has no data or recovery was skipped.\n")

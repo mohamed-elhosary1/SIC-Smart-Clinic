@@ -51,6 +51,12 @@ class State(rx.State):
     login_error_msg: str = ""
     landing_mode: str = ""  # '', 'patient', 'admin'
 
+    # Cloud Sync & Recovery Diagnostics
+    cloud_sync_provider: str = "Local Resilient Store"
+    cloud_sync_status: str = "synced"
+    cloud_last_synced: str = "Active"
+    cloud_is_syncing: bool = False
+
     def set_landing_mode(self, mode: str):
         self.landing_mode = mode
         self.login_error_msg = ""
@@ -972,3 +978,31 @@ class State(rx.State):
         self.confirm_action_type = "reset_database"
         self.confirm_target_index = -1
         self.confirm_modal_open = True
+
+    # Cloud Data Recovery & Sync Actions
+    def refresh_cloud_sync_status(self):
+        """Fetch real-time cloud sync diagnostics."""
+        status = clinic_manager.cloud_sync.get_status()
+        self.cloud_sync_provider = status.get("provider", "Local Store")
+        self.cloud_sync_status = status.get("status", "synced")
+        self.cloud_last_synced = status.get("last_synced", "Active")
+
+    def trigger_manual_cloud_sync(self):
+        """Manually trigger immediate push to cloud."""
+        self.cloud_is_syncing = True
+        res = clinic_manager.sync_cloud()
+        self.refresh_cloud_sync_status()
+        self.cloud_is_syncing = False
+        if res.get("success"):
+            return rx.toast.success(f"Cloud synced with {self.cloud_sync_provider}!")
+        return rx.toast.warning(f"Cloud sync status: {self.cloud_sync_status}")
+
+    def trigger_cloud_recovery(self):
+        """Force database recovery from cloud storage."""
+        success = clinic_manager.recover_from_cloud()
+        self.refresh_data()
+        self.refresh_cloud_sync_status()
+        if success:
+            return rx.toast.success("Database recovered from cloud storage!")
+        return rx.toast.info("Database is already up to date with cloud.")
+

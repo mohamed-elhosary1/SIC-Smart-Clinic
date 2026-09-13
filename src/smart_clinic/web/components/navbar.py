@@ -68,6 +68,34 @@ def navbar(breadcrumb: str = "Workspace") -> rx.Component:
                     border=f"1px solid {styles.BORDER}",
                     display=["none", "none", "flex"],
                 ),
+                # Cloud Sync Pill
+                rx.tooltip(
+                    rx.button(
+                        rx.hstack(
+                            rx.box(
+                                width="7px",
+                                height="7px",
+                                border_radius="9999px",
+                                background_color=rx.cond(
+                                    State.cloud_sync_status == "synced",
+                                    styles.COMPLETED,
+                                    styles.PENDING,
+                                ),
+                            ),
+                            rx.text("Cloud Synced", font_size="11px", font_weight="600"),
+                            spacing="1",
+                            align_items="center",
+                        ),
+                        on_click=State.trigger_manual_cloud_sync,
+                        loading=State.cloud_is_syncing,
+                        size="1",
+                        variant="soft",
+                        color_scheme="teal",
+                        cursor="pointer",
+                        border_radius="9999px",
+                    ),
+                    content="Click to manually push & synchronize database with Cloud",
+                ),
                 # Triage Priority Pill
                 rx.badge(
                     rx.hstack(

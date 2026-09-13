@@ -9,7 +9,7 @@ from .screens import (
     run_patient_portal,
     patient_lookup,
 )
-from .actions import print_section_header
+from .actions import print_section_header, action_cloud_sync
 
 __all__ = [
     "cli_main",
@@ -20,4 +20,5 @@ __all__ = [
     "run_patient_portal",
     "patient_lookup",
     "print_section_header",
+    "action_cloud_sync",
 ]

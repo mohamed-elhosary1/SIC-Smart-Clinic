@@ -82,6 +82,7 @@ SIC-Smart-Clinic/
 ├── requirements.txt                    # Project dependencies (Reflex, Pytest)
 ├── rxconfig.py                         # Reflex framework configuration
 ├── vercel.json                         # Vercel deployment configuration
+├── .env.example                        # Cloud synchronization environment template
 ├── .gitignore                          # Clean Git ignore rules (caches, temp files)
 ├── main.py                             # Unified entrypoint (CLI default, --web flag)
 │
@@ -97,50 +98,50 @@ SIC-Smart-Clinic/
 │       │   ├── triage.py               # make_triage_calculator() closure, recursive search
 │       │   ├── validators.py           # ID formats, Egyptian phone regex, status parsers
 │       │   ├── exceptions.py           # Custom exception hierarchy
-│       │   └── persistence.py          # Path-independent get_data_path() and get_report_path()
+│       │   ├── persistence.py          # Path-independent get_data_path() and get_report_path()
+│       │   └── cloud_sync.py           # CloudSyncClient (Vercel KV, JSONBin, REST, auto-recovery)
 │       │
 │       ├── cli/                        # Terminal Command-Line Interface
 │       │   ├── __init__.py             # CLI package exports
 │       │   ├── screens.py              # Opening screen, role navigation, login flow
-│       │   └── actions.py              # 13 Staff actions, Doctor actions, Patient portal
+│       │   └── actions.py              # 14 Staff actions, Doctor actions, Patient portal
 │       │
-│       └── web/                        # Shared Web Application Components & Pages
+│       └── web/                        # Web Application Components, State & Pages
 │           ├── __init__.py             # Web package re-exports
-│           ├── state.py                # Reactive Reflex state bridging UI to ClinicManager
+│           ├── state.py                # Reactive Reflex state connected to ClinicManager
 │           ├── styles.py               # Healthcare SaaS design tokens & theme palette
 │           ├── components/             # Reusable UI cards, tables, headers, and badges
 │           ├── dialogs/                # Modals (Patient, Doctor, Booking, History, Confirm)
 │           └── pages/                  # Route views (Login, Staff, Doctor, Patient)
 │
 ├── web/                                # Reflex Web Application Root
-│   ├── __init__.py
-│   ├── web.py                          # Reflex App instance & route compilation
-│   ├── state.py                        # Root state bridge
-│   ├── styles.py                       # Design tokens
-│   ├── assets/                         # Web static images & logo assets
-│   ├── components/                     # Component templates
-│   ├── dialogs/                        # Interactive modals
-│   └── pages/                          # Page templates
+│   ├── __init__.py                     # Package init
+│   └── web.py                          # Reflex App instance & route compilation
+│
+├── assets/                             # Static Images & Branding
+│   ├── clinic_logo.png
+│   ├── doctor_hero.png
+│   ├── patient_hero.jpg
+│   ├── logo.svg
+│   └── styles.css
 │
 ├── data/                               # Persistent Storage
-│   ├── clinic_data.json                # Canonical JSON database (Autosaved)
-│   └── daily_report.txt                # Exported operational audit reports
+│   └── clinic_data.json                # Canonical JSON database (Autosaved & Cloud-Synced)
 │
 ├── tests/                              # Automated Pytest Test Suite
 │   ├── __init__.py
 │   ├── conftest.py                     # Shared fixtures (managers, sample entities)
 │   ├── test_models.py                  # Domain models, priority levels, slot overlaps
 │   ├── test_auth.py                    # RBAC permissions, credentials verification
+│   ├── test_cloud_sync.py              # Cloud recovery, sync, and offline resilience
 │   ├── test_manager.py                 # Booking, collisions, queue ordering, triage closure
 │   ├── test_persistence.py             # JSON serialization, corrupt file recovery, reports
 │   └── test_web.py                     # Reflex state and UI styles validation
 │
-└── docs/                               # Architecture Documentation & Presentations
+└── docs/                               # Architecture Documentation
     ├── ERD.md                          # Entity-Relationship & Class Diagrams
     ├── CODE_EXPLANATION.md             # Detailed engineering implementation notes
-    ├── PROMPT_ROLE_REDESIGN.md         # RBAC architecture specification
-    ├── archive/                        # Historical milestone scripts & reviews
-    └── presentation/                   # Canva presentation slides & UI design systems
+    └── PROMPT_ROLE_REDESIGN.md         # RBAC architecture specification
 ```
 
 ---
@@ -163,6 +164,12 @@ Every appointment reserves a strictly enforced 30-minute busy duration:
 ### 3. Path-Independent Resilience
 - Automatic directory resolution (`get_data_path()`) locates `data/clinic_data.json` regardless of whether commands run from repo root, subfolders, or external scripts.
 - **Auto-Healing Backups**: Corrupt or malformed database files trigger an automatic `.bak` backup copy and regenerate a clean schema without crashing.
+
+### 4. Cloud Recovery & Synchronization Engine
+- **Ephemeral Auto-Recovery**: On startup in serverless or cloud container deployments (Vercel, Render, Railway), the system automatically checks and recovers the clinic database from cloud storage.
+- **Continuous Background Synchronization**: Every write action (patient registration, appointment booking, status change) automatically synchronizes with the cloud backend.
+- **Multi-Cloud Backends**: Native support for Vercel KV / Upstash Redis, JSONBin.io, or generic REST webhooks via standard library `urllib` (zero external dependencies).
+- **Offline-First Resilience**: Transparent fallback to local file persistence if the cloud is unreachable.
 
 ---
 

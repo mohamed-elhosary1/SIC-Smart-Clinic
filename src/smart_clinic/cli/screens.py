@@ -27,6 +27,7 @@ from .actions import (
     action_view_own_appointments,
     action_view_own_queue_position,
     action_view_own_history,
+    action_cloud_sync,
 )
 
 def run_staff_menu(manager: ClinicManager, current_user: StaffUser):
@@ -48,10 +49,11 @@ def run_staff_menu(manager: ClinicManager, current_user: StaffUser):
         print("|  [10] Reset Clinic Data   : Clear all saved records  |")
         print("|  [11] Export Report       : Save daily report to txt |")
         print("|  [12] Patient History     : View completed visits    |")
-        print("|  [13] Logout / Switch User                           |")
+        print("|  [13] Cloud Sync & Recovery: Push / Pull Cloud state  |")
+        print("|  [14] Logout / Switch User                           |")
         print("+" + "-" * 54 + "+")
 
-        raw_choice = input("\nEnter choice (1-13 or action name): ").strip()
+        raw_choice = input("\nEnter choice (1-14 or action name): ").strip()
         choice = parse_menu_choice(raw_choice)
 
         if choice == "1":
@@ -78,12 +80,14 @@ def run_staff_menu(manager: ClinicManager, current_user: StaffUser):
             action_export_report(manager)
         elif choice == "12":
             action_patient_history(manager)
-        elif choice == "13":
+        elif choice in ("13", "sync", "cloud", "cloud sync"):
+            action_cloud_sync(manager)
+        elif choice == "14":
             print(f"\nLogging out {current_user.display_role()} ({current_user.username})...")
             manager.save_to_file("clinic_data.json", silent=True)
             return
         else:
-            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please select from 1 to 13.\n")
+            print(f"\n[ERROR] Invalid choice '{raw_choice}'. Please select from 1 to 14.\n")
 
 
 def run_doctor_menu(manager: ClinicManager, current_user: DoctorUser):

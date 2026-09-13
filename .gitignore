@@ -37,6 +37,7 @@ assets/external/
 # Environment & local secrets
 .env
 .env.*
+!.env.example
 .venv
 env/
 venv/

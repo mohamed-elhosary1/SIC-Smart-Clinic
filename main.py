@@ -49,6 +49,8 @@ from smart_clinic.core import (
     get_data_path,
     get_report_path,
     DEFAULT_APPOINTMENT_DURATION,
+    CloudSyncClient,
+    get_cloud_sync_client,
 )
 
 # Re-export CLI functions for backward compatibility

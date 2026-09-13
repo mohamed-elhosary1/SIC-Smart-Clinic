@@ -43,6 +43,10 @@ from .persistence import (
     REPO_ROOT,
     DATA_DIR,
 )
+from .cloud_sync import (
+    CloudSyncClient,
+    get_cloud_sync_client,
+)
 from .manager import ClinicManager
 
 __all__ = [
@@ -77,5 +81,7 @@ __all__ = [
     "get_report_path",
     "REPO_ROOT",
     "DATA_DIR",
+    "CloudSyncClient",
+    "get_cloud_sync_client",
     "ClinicManager",
 ]

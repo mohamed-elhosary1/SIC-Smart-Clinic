@@ -31,18 +31,20 @@ from .models import (
 from .validators import validate_patient_id, validate_doctor_id, validate_phone, parse_status
 from .triage import make_triage_calculator, find_visits_recursive
 from .persistence import get_data_path, get_report_path
+from .cloud_sync import get_cloud_sync_client, CloudSyncClient
 
 
 class ClinicManager:
     """Central manager handling business logic, appointments, queues, caching, and persistence."""
 
-    def __init__(self, base_fee: float = 100.0):
+    def __init__(self, base_fee: float = 100.0, cloud_sync: Optional[CloudSyncClient] = None):
         self.patients: dict[str, Patient] = {}
         self.doctors: dict[str, Doctor] = {}
         self.appointments: list[Appointment] = []
         # Instance attribute mapping doctor IDs to booked start times
         self.booked_date: dict[str, list[datetime]] = {}
         self.fee_calculator = make_triage_calculator(base_fee=base_fee)
+        self.cloud_sync: CloudSyncClient = cloud_sync or get_cloud_sync_client()
         self.current_user: User | None = None
         self._visit_lookup_cache: dict[str, list] = {}
 
@@ -452,6 +454,8 @@ class ClinicManager:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             if not silent:
                 print(f"\n[SUCCESS] Clinic data saved successfully to '{path}'.\n")
+            if getattr(self, "cloud_sync", None) and self.cloud_sync.enabled:
+                self.cloud_sync.push_cloud_data(data)
             return True
         except Exception as e:
             print(f"\n[ERROR] Failed saving data to '{path}': {e}\n")
@@ -471,6 +475,12 @@ class ClinicManager:
                     path = p
             else:
                 path = p
+
+        # Automatic Cloud Data Recovery on startup / ephemeral deployments
+        if getattr(self, "cloud_sync", None) and self.cloud_sync.enabled:
+            recovered, msg = self.cloud_sync.recover_if_needed(path)
+            if recovered:
+                print(f"\n[CLOUD RECOVERY] {msg}\n")
 
         initial_data = {"patients": [], "doctors": [], "appointments": []}
         parent = os.path.dirname(str(path))
@@ -611,4 +621,58 @@ class ClinicManager:
         if hasattr(self.fee_calculator, "reset_count"):
             self.fee_calculator.reset_count()
         return self.save_to_file(path, silent=True)
+
+    # ---------- Cloud Sync & Recovery ----------
+
+    def sync_cloud(self) -> dict:
+        """Push current database snapshot to cloud storage and return diagnostics."""
+        data = {
+            "patients": [
+                {
+                    "type": "Emergency" if (isinstance(p, EmergencyPatient) or (p.priority_level() if callable(p.priority_level) else p.priority_level) == 1) else "Regular",
+                    "person_id": p.person_id,
+                    "name": p.name,
+                    "phone": p.phone,
+                    "age": p.age,
+                    "case_type": p.case_type
+                }
+                for p in self.patients.values()
+            ],
+            "doctors": [
+                {
+                    "person_id": d.person_id,
+                    "name": d.name,
+                    "phone": d.phone,
+                    "specialty": d.specialty,
+                    "availability": d.availability
+                }
+                for d in self.doctors.values()
+            ],
+            "appointments": [
+                {
+                    "patient_id": a.patient.person_id,
+                    "doctor_id": a.doctor.person_id,
+                    "time": a.time.isoformat() if hasattr(a, "time") and isinstance(a.time, datetime) else getattr(a, "time_slot", "09:00-09:30"),
+                    "status": a.status,
+                    "fee": getattr(a, "fee", 100.0)
+                }
+                for a in self.appointments
+            ]
+        }
+        success = self.cloud_sync.push_cloud_data(data)
+        status = self.cloud_sync.get_status()
+        status["success"] = success
+        return status
+
+    def recover_from_cloud(self, path: str | Path | None = None) -> bool:
+        """Force recovery of latest database from cloud storage into local memory."""
+        cloud_data = self.cloud_sync.fetch_cloud_data()
+        if not cloud_data or not isinstance(cloud_data, dict):
+            return False
+        if path is None:
+            path = get_data_path("clinic_data.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cloud_data, f, ensure_ascii=False, indent=4)
+        return self.load_from_file(path)
+
 
