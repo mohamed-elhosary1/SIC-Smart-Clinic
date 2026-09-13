@@ -1,9 +1,16 @@
+import sys
+from pathlib import Path
 import reflex as rx
-from web import styles
-from web.pages.login import login_page
-from web.pages.staff import staff_page
-from web.pages.doctor import doctor_page
-from web.pages.patient import patient_page
+
+_SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
+from smart_clinic.web import styles
+from smart_clinic.web.pages.login import login_page
+from smart_clinic.web.pages.staff import staff_page
+from smart_clinic.web.pages.doctor import doctor_page
+from smart_clinic.web.pages.patient import patient_page
 
 app = rx.App(
     stylesheets=[
