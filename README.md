@@ -1,4 +1,4 @@
-# 🏥 Smart Clinic Management & Triage System
+# Smart Clinic Management & Triage System
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Reflex](https://img.shields.io/badge/Reflex-0.9.11-6E56CF.svg?logo=react&logoColor=white)](https://reflex.dev/)
@@ -14,7 +14,7 @@ The system is built on a shared, robust domain layer featuring **dynamic triage 
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 - [System Architecture](#system-architecture)
 - [Repository Structure](#repository-structure)
 - [Key Features](#key-features)
@@ -27,15 +27,15 @@ The system is built on a shared, robust domain layer featuring **dynamic triage 
 
 ---
 
-## 🏛️ System Architecture
+## System Architecture
 
 Both the Terminal CLI and the Reflex Web Application share the exact same underlying domain models, business validation rules, and persistence controller:
 
 ```mermaid
 flowchart TD
     subgraph UI ["User Interfaces"]
-        CLI["💻 Interactive CLI<br/>(Terminal / Console)"]
-        WEB["🌐 Reflex Web App<br/>(Staff / Doctor / Patient Kiosk)"]
+        CLI["Interactive CLI<br/>(Terminal / Console)"]
+        WEB["Reflex Web App<br/>(Staff / Doctor / Patient Kiosk)"]
     end
 
     subgraph Adapters ["Interface Layer"]
@@ -74,7 +74,7 @@ flowchart TD
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 SIC-Smart-Clinic/
@@ -145,7 +145,7 @@ SIC-Smart-Clinic/
 
 ---
 
-## ⚡ Key Features
+## Key Features
 
 ### 1. Advanced Functional Programming & OOP
 - **Triage Fee Closure**: `make_triage_calculator(base_fee)` encapsulates a private counter of treated emergency cases, dynamically calculating progressive emergency fees without global state.
@@ -166,7 +166,7 @@ Every appointment reserves a strictly enforced 30-minute busy duration:
 
 ---
 
-## 🔐 Role-Based Access Control (RBAC)
+## Role-Based Access Control (RBAC)
 
 | Role | Username / Access | Password | Operational Scope |
 |---|---|---|---|
@@ -176,7 +176,7 @@ Every appointment reserves a strictly enforced 30-minute busy duration:
 
 ---
 
-## 🚀 Quick Start & Installation
+## Quick Start & Installation
 
 ### Prerequisites
 - Python 3.10+ (Python 3.11 recommended)
@@ -204,7 +204,7 @@ pip install -r requirements.txt
 
 ---
 
-## 💻 Usage Guide
+## Usage Guide
 
 ### Running the Interactive CLI
 Launch the terminal console directly:
@@ -224,7 +224,7 @@ Open your browser at `http://localhost:3000`.
 
 ---
 
-## 🧪 Automated Testing
+## Automated Testing
 
 The repository includes a comprehensive 21-test automated suite covering all layers:
 
@@ -241,7 +241,7 @@ pytest tests/ -v
 
 ---
 
-## 🔄 Backward Compatibility
+## Backward Compatibility
 
 All legacy entrypoints and scripts remain 100% compatible:
 - `python main.py` runs the interactive terminal application just as before.
@@ -250,6 +250,6 @@ All legacy entrypoints and scripts remain 100% compatible:
 
 ---
 
-## 👥 Contributors & Acknowledgements
+## Contributors & Acknowledgements
 - **Samsung Innovation Campus (SIC)** — Healthcare Software Engineering Capstone
 - **Project 5 Team**: Smart Clinic Queue System
