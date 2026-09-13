@@ -8,16 +8,11 @@ import re
 import shutil
 from datetime import datetime, timedelta
 from functools import reduce
-
-
 # =========================================================
 # STANDARD SYSTEM CONSTANTS
 # =========================================================
-
 # Default duration for any clinic appointment slot (30 minutes)
 DEFAULT_APPOINTMENT_DURATION = timedelta(minutes=30)
-
-
 # =========================================================
 # CUSTOM EXCEPTIONS HIERARCHY
 # =========================================================
@@ -75,7 +70,6 @@ class User:
 
 class StaffUser(User):
     """Clinic staff member with full operational and administrative privileges."""
-
     def __init__(self, username: str, password: str):
         super().__init__(username, password, allowed_actions=set())
 
@@ -1729,4 +1723,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--web" in sys.argv:
+        import subprocess
+        print("\n" + "=" * 56)
+        print("  SMART CLINIC - STARTING MODERN REFLEX WEB APPLICATION  ")
+        print("=" * 56)
+        print("[INFO] Launching Reflex Web Server on http://localhost:3000 ...\n")
+        subprocess.run(["reflex", "run"])
+    else:
+        main()

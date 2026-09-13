@@ -3,36 +3,191 @@
         {
             "type": "Regular",
             "person_id": "patient-101",
-            "name": "John Doe",
-            "phone": "01122233344",
-            "age": 30,
-            "case_type": "Hypertension"
-        },
-        {
-            "type": "Emergency",
-            "person_id": "patient-901",
-            "name": "Jane Critical",
-            "phone": "01233344455",
-            "age": 25,
-            "case_type": "Critical"
+            "name": "Mohamed Salah",
+            "phone": "01011223344",
+            "age": 32,
+            "case_type": "Hamstring Muscle Strain"
         },
         {
             "type": "Regular",
-            "person_id": "patient-586",
-            "name": "Alice Smith",
-            "phone": "01099988877",
-            "age": 28,
-            "case_type": "Flu"
+            "person_id": "patient-102",
+            "name": "Lionel Messi",
+            "phone": "01122334455",
+            "age": 37,
+            "case_type": "Adductor Tendinopathy"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-103",
+            "name": "Cristiano Ronaldo",
+            "phone": "01233445566",
+            "age": 40,
+            "case_type": "Routine Athletic Cardiac Screening"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-104",
+            "name": "Kylian Mbappé",
+            "phone": "01099887766",
+            "age": 26,
+            "case_type": "Nasal Fracture Post-Op Checkup"
+        },
+        {
+            "type": "Emergency",
+            "person_id": "patient-105",
+            "name": "Erling Haaland",
+            "phone": "01555443322",
+            "age": 24,
+            "case_type": "Acute Ankle Ligament Sprain"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-106",
+            "name": "Karim Benzema",
+            "phone": "01144556677",
+            "age": 37,
+            "case_type": "Quadriceps Tendon Recovery"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-107",
+            "name": "Mahmoud Shikabala",
+            "phone": "01277889900",
+            "age": 39,
+            "case_type": "Calf Muscle Fatigue"
+        },
+        {
+            "type": "Emergency",
+            "person_id": "patient-108",
+            "name": "Emam Ashour",
+            "phone": "01066778899",
+            "age": 27,
+            "case_type": "Acute Shoulder Clavicle Trauma"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-109",
+            "name": "Mahmoud Trezeguet",
+            "phone": "01188990011",
+            "age": 30,
+            "case_type": "Post-ACL Rehabilitation Followup"
+        },
+        {
+            "type": "Regular",
+            "person_id": "patient-110",
+            "name": "Zinedine Zidane",
+            "phone": "01599001122",
+            "age": 52,
+            "case_type": "Executive Health & Joint Checkup"
         }
     ],
     "doctors": [
         {
             "person_id": "doctor-1",
-            "name": "Dr. House",
-            "phone": "01012345678",
-            "specialty": "Diagnostic",
+            "name": "Magdi Yacoub",
+            "phone": "01001122334",
+            "specialty": "Cardiothoracic Surgery",
+            "availability": true
+        },
+        {
+            "person_id": "doctor-2",
+            "name": "Mohamed Ghoneim",
+            "phone": "01112233445",
+            "specialty": "Urology & Kidney Surgery",
+            "availability": true
+        },
+        {
+            "person_id": "doctor-3",
+            "name": "Hossam Mowafi",
+            "phone": "01223344556",
+            "specialty": "Internal Medicine & Critical Care",
+            "availability": true
+        },
+        {
+            "person_id": "doctor-4",
+            "name": "Hani El-Nazer",
+            "phone": "01055667788",
+            "specialty": "Dermatology",
+            "availability": true
+        },
+        {
+            "person_id": "doctor-5",
+            "name": "Yehia El-Rakhawy",
+            "phone": "01556677889",
+            "specialty": "Psychiatry & Behavioral Health",
             "availability": true
         }
     ],
-    "appointments": []
+    "appointments": [
+        {
+            "patient_id": "patient-101",
+            "doctor_id": "doctor-1",
+            "time": "2026-10-10T09:30:00",
+            "status": "completed",
+            "fee": 100.0
+        },
+        {
+            "patient_id": "patient-108",
+            "doctor_id": "doctor-3",
+            "time": "2026-10-12T12:00:00",
+            "status": "completed",
+            "fee": 150.0
+        },
+        {
+            "patient_id": "patient-102",
+            "doctor_id": "doctor-1",
+            "time": "2026-10-25T10:00:00",
+            "status": "in_progress",
+            "fee": 100.0
+        },
+        {
+            "patient_id": "patient-105",
+            "doctor_id": "doctor-3",
+            "time": "2026-10-25T10:30:00",
+            "status": "pending",
+            "fee": 150.0
+        },
+        {
+            "patient_id": "patient-101",
+            "doctor_id": "doctor-3",
+            "time": "2026-10-25T11:00:00",
+            "status": "pending",
+            "fee": 100.0
+        },
+        {
+            "patient_id": "patient-103",
+            "doctor_id": "doctor-1",
+            "time": "2026-10-26T09:00:00",
+            "status": "pending",
+            "fee": 100.0
+        },
+        {
+            "patient_id": "patient-104",
+            "doctor_id": "doctor-2",
+            "time": "2026-10-26T09:30:00",
+            "status": "pending",
+            "fee": 100.0
+        },
+        {
+            "patient_id": "patient-107",
+            "doctor_id": "doctor-4",
+            "time": "2026-10-26T10:00:00",
+            "status": "pending",
+            "fee": 100.0
+        },
+        {
+            "patient_id": "patient-109",
+            "doctor_id": "doctor-2",
+            "time": "2026-10-26T11:00:00",
+            "status": "pending",
+            "fee": 100.0
+        },
+        {
+            "patient_id": "patient-110",
+            "doctor_id": "doctor-5",
+            "time": "2026-10-27T12:00:00",
+            "status": "pending",
+            "fee": 100.0
+        }
+    ]
 }

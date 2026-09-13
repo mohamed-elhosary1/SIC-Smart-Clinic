@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "sic-clinic",
+  "framework": null,
+  "buildCommand": "pip install -r requirements.txt && reflex export --frontend-only --no-zip",
+  "outputDirectory": ".web/_static",
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
+    }
+  ]
+}
